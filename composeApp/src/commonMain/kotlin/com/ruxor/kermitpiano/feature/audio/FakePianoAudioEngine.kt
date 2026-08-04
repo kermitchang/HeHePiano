@@ -18,6 +18,7 @@ internal class FakePianoAudioEngine : PianoAudioEngine {
     override fun noteOn(note: Int, velocity: Int, channel: Int) { events += AudioEvent.NoteOn(note, velocity, channel) }
     override fun noteOff(note: Int, channel: Int) { events += AudioEvent.NoteOff(note, channel) }
     override fun controlChange(controller: Int, value: Int, channel: Int) { events += AudioEvent.ControlChange(controller, value, channel) }
+    override fun pitchBend(value: Int, channel: Int) { events += AudioEvent.PitchBend(value, channel) }
     override fun allNotesOff() { events += AudioEvent.AllNotesOff }
     override suspend fun close() { events += AudioEvent.Closed; mutableState.value = AudioEngineState.Uninitialized }
 }
@@ -26,6 +27,7 @@ internal sealed interface AudioEvent {
     data class NoteOn(val note: Int, val velocity: Int, val channel: Int) : AudioEvent
     data class NoteOff(val note: Int, val channel: Int) : AudioEvent
     data class ControlChange(val controller: Int, val value: Int, val channel: Int) : AudioEvent
+    data class PitchBend(val value: Int, val channel: Int) : AudioEvent
     data object AllNotesOff : AudioEvent
     data object Closed : AudioEvent
 }

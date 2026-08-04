@@ -9,6 +9,7 @@ internal interface PianoAudioEngine : AudioDiagnosticsProvider {
     fun noteOn(note: Int, velocity: Int, channel: Int = 0)
     fun noteOff(note: Int, channel: Int = 0)
     fun controlChange(controller: Int, value: Int, channel: Int = 0)
+    fun pitchBend(value: Int, channel: Int = 0)
     fun allNotesOff()
     suspend fun close()
 }

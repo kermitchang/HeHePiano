@@ -19,6 +19,7 @@ internal class NoAudioEngine(private val reason: String = "Audio is unavailable.
     override fun noteOn(note: Int, velocity: Int, channel: Int) = Unit
     override fun noteOff(note: Int, channel: Int) = Unit
     override fun controlChange(controller: Int, value: Int, channel: Int) = Unit
+    override fun pitchBend(value: Int, channel: Int) = Unit
     override fun allNotesOff() = Unit
     override suspend fun close() { mutableState.value = AudioEngineState.Uninitialized }
 }

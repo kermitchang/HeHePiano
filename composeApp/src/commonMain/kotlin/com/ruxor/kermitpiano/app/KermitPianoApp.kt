@@ -157,6 +157,8 @@ internal fun KermitPianoApp(
         midiInput?.start(
             onNoteOn = { note, _ -> playerAudioRouter.noteOn(note.value, velocity = 96) },
             onNoteOff = { note -> playerAudioRouter.noteOff(note.value) },
+            onPitchBend = { value -> playerAudioRouter.pitchBend(value) },
+            onControlChange = { controller, value -> playerAudioRouter.controlChange(controller, value) },
         )
     }
 

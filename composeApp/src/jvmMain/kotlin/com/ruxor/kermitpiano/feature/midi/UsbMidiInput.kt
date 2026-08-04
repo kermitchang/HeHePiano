@@ -26,7 +26,12 @@ internal class UsbMidiInput(
     private var device: MidiDevice? = null
     private var transmitter: Transmitter? = null
 
-    override fun start(onNoteOn: (MidiNote, Int) -> Unit, onNoteOff: (MidiNote) -> Unit) {
+    override fun start(
+        onNoteOn: (MidiNote, Int) -> Unit,
+        onNoteOff: (MidiNote) -> Unit,
+        onPitchBend: (Int) -> Unit,
+        onControlChange: (Int, Int) -> Unit,
+    ) {
         if (!running.compareAndSet(false, true)) return
         val matched = findDevice()
         if (matched == null) {
@@ -53,6 +58,11 @@ internal class UsbMidiInput(
                             }
                         }
                         ShortMessage.NOTE_OFF -> onNoteOff(MidiNote(short.data1))
+                        ShortMessage.PITCH_BEND -> {
+                            val value = (short.data2 shl 7) or short.data1
+                            onPitchBend(value)
+                        }
+                        ShortMessage.CONTROL_CHANGE -> onControlChange(short.data1, short.data2)
                     }
                 }
 

@@ -99,6 +99,11 @@ internal class FluidSynthPianoAudioEngine(
         sendCommand("cc $channel ${controller.coerceIn(0, 127)} ${value.coerceIn(0, 127)}")
     }
 
+    override fun pitchBend(value: Int, channel: Int) {
+        // FluidSynth bend expects a 14-bit value in 0..16383 (8192 = centre).
+        sendCommand("bend $channel ${value.coerceIn(0, 16_383)}")
+    }
+
     override fun allNotesOff() {
         if (process?.isAlive != true) {
             activeNotes.clear()
