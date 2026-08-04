@@ -23,23 +23,31 @@ Launch the desktop application:
 ./gradlew :composeApp:run
 ```
 
-The app starts in **Practice** mode. Use **Open MIDI** for an external file, or **Library** for songs in `source/midi/`.
+The app starts in **Practice** mode. Use **Open MIDI** to choose an external file, or **Library** to select a song from `source/midi/`. Imported files are copied into the local library without replacing an existing file; name collisions receive a numeric suffix.
 
 ## Local MIDI Library
 
-Place `.mid` or `.midi` files in `source/midi/`. The desktop app derives this directory from its working directory, scans it once at startup, and rescans it only when **Refresh Library** is selected.
+Place `.mid` or `.midi` files in `source/midi/`. The desktop app finds the project root from its working directory, scans the library at startup, and rescans it when **Refresh Library** is selected.
 
 The checked-in `FFVII - Tifas Theme [mk].mid` is a parser and layout test song.
 
 ## Piano Audio
 
-Audio is optional. The first backend uses one long-lived interactive [FluidSynth](https://www.fluidsynth.org/) process and a user-provided `.sf2` SoundFont. No sound bank is downloaded or committed automatically.
+Audio is optional. The desktop backend uses one long-lived interactive [FluidSynth](https://www.fluidsynth.org/) process and a user-provided `.sf2` SoundFont. No sound bank is downloaded or committed automatically.
 
 1. Install FluidSynth yourself, for example on macOS: `brew install fluid-synth`.
 2. Put a licensed SoundFont at `source/soundfonts/piano.sf2`.
-3. Keep its licence information in `source/soundfonts/LICENSE.example.txt` (renaming it if desired).
+3. Record its name, author, source URL, and licence in `source/soundfonts/LICENSE.example.txt`; retain a licence text such as `LICENSE-<name>.txt` when supplied.
 
-If FluidSynth or a SoundFont is missing, the app stays playable in NoAudio mode and shows its audio status. SoundFont files are intentionally ignored by Git.
+To use a SoundFont stored elsewhere, set `KERMITPIANO_SOUNDFONT` before launching the app:
+
+```shell
+KERMITPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
+```
+
+The lookup order is the configured path, the `kermitpiano.soundfont` JVM property, `KERMITPIANO_SOUNDFONT`, `source/soundfonts/piano.sf2`, then another valid `.sf2` file in that directory. The selected path and any lookup failure are printed at startup. Enable **Debug** from the More menu to inspect the audio backend and send a **Test C4** note once audio is ready.
+
+If FluidSynth or a SoundFont is missing, the app stays playable in NoAudio mode and shows its audio status. Everything in `source/soundfonts/` is intentionally ignored by Git except the directory documentation and `LICENSE-*.txt` files, preventing proprietary or licence-restricted audio assets from being committed accidentally.
 
 ## Keyboard Mapping
 

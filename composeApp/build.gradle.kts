@@ -1,5 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.api.tasks.JavaExec
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -49,5 +50,11 @@ compose.desktop {
             packageName = "KermitPiano"
             packageVersion = "0.1.0"
         }
+    }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    if (name == "run") {
+        workingDir = rootProject.projectDir
     }
 }

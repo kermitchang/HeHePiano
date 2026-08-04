@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.asStateFlow
 internal class FakePianoAudioEngine : PianoAudioEngine {
     private val mutableState = MutableStateFlow<AudioEngineState>(AudioEngineState.Uninitialized)
     override val state: StateFlow<AudioEngineState> = mutableState.asStateFlow()
+    private val mutableDiagnostics = MutableStateFlow(AudioEngineDiagnostics(backend = "Fake"))
+    override val diagnostics: StateFlow<AudioEngineDiagnostics> = mutableDiagnostics.asStateFlow()
     val events = mutableListOf<AudioEvent>()
 
     override suspend fun initialize(config: PianoAudioConfig) {

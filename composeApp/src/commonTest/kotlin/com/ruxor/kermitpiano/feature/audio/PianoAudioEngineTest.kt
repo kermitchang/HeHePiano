@@ -50,4 +50,15 @@ class PianoAudioEngineTest {
             engine.events,
         )
     }
+
+    @Test
+    fun `test C4 sends a note on then note off only when the engine is ready`() = runBlocking {
+        val engine = FakePianoAudioEngine()
+
+        assertEquals(false, playTestC4(engine, pause = {}))
+        engine.initialize(PianoAudioConfig())
+
+        assertEquals(true, playTestC4(engine, pause = {}))
+        assertEquals(listOf(AudioEvent.NoteOn(60, 100, 0), AudioEvent.NoteOff(60, 0)), engine.events)
+    }
 }

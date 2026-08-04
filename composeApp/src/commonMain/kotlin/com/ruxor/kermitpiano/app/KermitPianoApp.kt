@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -58,10 +60,13 @@ import com.ruxor.kermitpiano.feature.keyboardinput.KeyboardInputState
 import com.ruxor.kermitpiano.feature.keyboardinput.KeyboardInput
 import com.ruxor.kermitpiano.feature.keyboardinput.KeyboardEventType
 import com.ruxor.kermitpiano.feature.audio.AudioEngineState
+import com.ruxor.kermitpiano.feature.audio.AudioEngineDiagnostics
+import com.ruxor.kermitpiano.feature.audio.AudioStartupInfo
 import com.ruxor.kermitpiano.feature.audio.NoAudioEngine
 import com.ruxor.kermitpiano.feature.audio.PianoAudioConfig
 import com.ruxor.kermitpiano.feature.audio.PianoAudioEngine
 import com.ruxor.kermitpiano.feature.audio.PlayerInputAudioRouter
+import com.ruxor.kermitpiano.feature.audio.playTestC4
 import com.ruxor.kermitpiano.feature.midi.MidiAnalysis
 import com.ruxor.kermitpiano.feature.midi.MidiAnalyzer
 import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
@@ -93,6 +98,7 @@ internal fun KermitPianoApp(
     localSongSource: SongSource? = null,
     audioEngine: PianoAudioEngine = NoAudioEngine(),
     audioConfig: PianoAudioConfig = PianoAudioConfig(),
+    audioStartupInfo: AudioStartupInfo = AudioStartupInfo("", null, null, emptyList(), null, null),
 ) {
     val keyboardInputState by keyboardInput.state.collectAsState()
     val songRepository: SongRepository = remember { DemoSongRepository() }
@@ -116,6 +122,7 @@ internal fun KermitPianoApp(
     var localSongs by remember { mutableStateOf<List<SongFile>>(emptyList()) }
     var playerSoundEnabled by remember { mutableStateOf(true) }
     val audioState by audioEngine.state.collectAsState()
+    val audioDiagnostics by audioEngine.diagnostics.collectAsState()
     val followTarget = remember(song, playbackState.songTime) { followSongViewport(song, playbackState.songTime) }
     val followFirst by animateIntAsState(followTarget.firstVisibleMidi, tween(450))
     val followLast by animateIntAsState(followTarget.lastVisibleMidi, tween(450))
@@ -131,6 +138,10 @@ internal fun KermitPianoApp(
 
     LaunchedEffect(audioEngine, audioConfig) {
         audioEngine.initialize(audioConfig)
+    }
+
+    DisposableEffect(audioEngine) {
+        onDispose { coroutineScope.launch { audioEngine.close() } }
     }
 
     SideEffect {
@@ -165,7 +176,7 @@ internal fun KermitPianoApp(
                     debugVisible = debugVisible,
                     onDebugChanged = { debugVisible = !debugVisible },
                     onOpenMidi = {
-                        openMidiFile()?.let { selected ->
+                        requestMidiImport(openMidiFile) { selected ->
                             analysis = MidiAnalyzer().analyze(selected.name, StandardMidiParser().parse(selected.bytes))
                             trackMappings = analysis!!.tracks.associate { it.index to it.suggestedHand }
                         }
@@ -221,6 +232,12 @@ internal fun KermitPianoApp(
                     }
                     if (debugVisible) SongInformationPanel(
                         song, playbackState, keyboardInputState, viewport, pianoLayoutKeyCount(viewport),
+                        audioState, audioStartupInfo, audioDiagnostics,
+                        onTestC4 = {
+                            coroutineScope.launch {
+                                playTestC4(audioEngine)
+                            }
+                        },
                         modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
                     )
                     analysis?.let { midi ->
@@ -323,7 +340,7 @@ private fun WideTopBar(
     onLibrary: () -> Unit,
 ) = TopBarRow {
     Brand(showName = true)
-    SongControls(songTitle, onOpenMidi, onSelectSong, Modifier.weight(1f))
+    SongControls(songTitle, onOpenMidi, onSelectSong, showSongTitle = true)
     PlaybackGroup(state, onAction, showRestart = true, compactSpeed = false)
     PianoViewControls(viewport, onViewportChanged)
     InputBadge()
@@ -349,7 +366,7 @@ private fun CompactTopBar(
     onLibrary: () -> Unit,
 ) = TopBarRow {
     Brand(showName = false)
-    SongControls(songTitle, onOpenMidi, onSelectSong, Modifier.weight(1f))
+    SongControls(songTitle, onOpenMidi, onSelectSong, showSongTitle = false)
     PlaybackGroup(state, onAction, showRestart = true, compactSpeed = true)
     PianoViewControls(viewport, onViewportChanged)
     AudioStatusButton(audioState, playerSoundEnabled, onPlayerSoundChanged)
@@ -396,11 +413,18 @@ private fun Brand(showName: Boolean) {
 }
 
 @Composable
-private fun SongControls(songTitle: String, onOpenMidi: () -> Unit, onSelectSong: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun SongControls(
+    songTitle: String,
+    onOpenMidi: () -> Unit,
+    onSelectSong: () -> Unit,
+    showSongTitle: Boolean,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onOpenMidi) { Text("Open MIDI") }
-        OutlinedButton(onClick = onSelectSong, modifier = Modifier.weight(1f)) {
-            Text(songTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (showSongTitle) {
+            OutlinedButton(onClick = onSelectSong, modifier = Modifier.widthIn(max = TopBarLayoutPolicy.songTitleLimit(TopBarLayoutMode.Wide).dp)) {
+                Text(songTitle, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
@@ -489,7 +513,7 @@ private fun MoreMenu(
             }
             DropdownMenuItem(text = { Text(if (debugVisible) "Hide Debug" else "Debug") }, onClick = { onDebugChanged(); expanded = false })
             DropdownMenuItem(text = { Text(if (playerSoundEnabled) "Player Sound: On" else "Player Sound: Off") }, onClick = { onPlayerSoundChanged(!playerSoundEnabled); expanded = false })
-            DropdownMenuItem(text = { Text(audioState.shortLabel()) }, onClick = { expanded = false })
+            DropdownMenuItem(text = { Text(audioState.topBarLabel()) }, onClick = { expanded = false })
             DropdownMenuItem(text = { Text("Local Library") }, onClick = { onLibrary(); expanded = false })
         }
     }
@@ -497,16 +521,21 @@ private fun MoreMenu(
 
 @Composable
 private fun AudioStatusButton(audioState: AudioEngineState, playerSoundEnabled: Boolean, onPlayerSoundChanged: (Boolean) -> Unit) {
-    OutlinedButton(onClick = { onPlayerSoundChanged(!playerSoundEnabled) }) {
-        Text(if (playerSoundEnabled) audioState.shortLabel() else "Audio Off")
+    OutlinedButton(onClick = { onPlayerSoundChanged(!playerSoundEnabled) }, modifier = Modifier.widthIn(max = 116.dp)) {
+        Text(
+            text = if (playerSoundEnabled) audioState.topBarLabel() else "Audio Off",
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
-private fun AudioEngineState.shortLabel(): String = when (this) {
+internal fun AudioEngineState.topBarLabel(): String = when (this) {
     AudioEngineState.Uninitialized -> "Audio Off"
     AudioEngineState.Initializing -> "Audio…"
-    is AudioEngineState.Ready -> "Piano Ready"
-    is AudioEngineState.Error -> if (message.startsWith("SoundFont Missing")) "SoundFont Missing" else if (message.startsWith("FluidSynth Missing")) "FluidSynth Missing" else "Audio Error"
+    is AudioEngineState.Ready -> "Audio Ready"
+    is AudioEngineState.Error -> if (message.startsWith("SoundFont Missing")) "SF2 Missing" else if (message.startsWith("FluidSynth Missing")) "FluidSynth Missing" else "Audio Error"
 }
 
 @Composable
@@ -553,15 +582,19 @@ private fun SongInformationPanel(
     keyboardInputState: KeyboardInputState,
     viewport: PianoViewport,
     visibleKeyCount: Int,
+    audioState: AudioEngineState,
+    audioStartupInfo: AudioStartupInfo,
+    audioDiagnostics: AudioEngineDiagnostics,
+    onTestC4: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier.width(324.dp),
+        modifier = modifier.width(340.dp).heightIn(max = 680.dp),
         colors = CardDefaults.cardColors(containerColor = GameVisualTokens.glassSurface),
         shape = workspaceShape,
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(18.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             PanelTitle("Song Info")
@@ -589,6 +622,27 @@ private fun SongInformationPanel(
             InformationRow("Visible MIDI", viewport.visibleMidiRange.toString())
             InformationRow("Total Piano Keys", PianoModel.keys.size.toString())
             InformationRow("Visible Keys", visibleKeyCount.toString())
+            PanelDivider()
+            PanelTitle("Audio")
+            InformationRow("State", audioState.topBarLabel())
+            InformationRow("Backend", audioDiagnostics.backend)
+            InformationRow("Executable", audioDiagnostics.executablePath ?: "—")
+            InformationRow("Selected SF2", audioStartupInfo.selectedSoundFontPath ?: "—")
+            InformationRow("Process PID", audioDiagnostics.processId?.toString() ?: "—")
+            InformationRow("Last error", audioDiagnostics.lastError ?: audioStartupInfo.discoveryFailureReason ?: "—")
+            if (audioState is AudioEngineState.Ready) Button(onClick = onTestC4) { Text("Test C4") }
+            PanelDivider()
+            PanelTitle("SoundFont Discovery")
+            InformationRow("user.dir", audioStartupInfo.userDirectory)
+            InformationRow("Project root", audioStartupInfo.projectRoot ?: "—")
+            InformationRow("Configured", audioStartupInfo.configuredSoundFontPath ?: "—")
+            audioStartupInfo.candidates.forEach { candidate ->
+                Text(candidate.source, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                InformationRow("Path", candidate.absolutePath)
+                InformationRow("Exists / regular / readable", "${candidate.exists} / ${candidate.regularFile} / ${candidate.readable}")
+                InformationRow("Size / valid", "${candidate.sizeBytes ?: "—"} / ${candidate.valid}")
+            }
+            audioDiagnostics.stderr?.let { InformationRow("FluidSynth stderr", it) }
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Judgement line aligned to PianoLayout",

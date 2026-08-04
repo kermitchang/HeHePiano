@@ -7,9 +7,13 @@ import kotlinx.coroutines.flow.asStateFlow
 internal class NoAudioEngine(private val reason: String = "Audio is unavailable.") : PianoAudioEngine {
     private val mutableState = MutableStateFlow<AudioEngineState>(AudioEngineState.Uninitialized)
     override val state: StateFlow<AudioEngineState> = mutableState.asStateFlow()
+    private val mutableDiagnostics = MutableStateFlow(AudioEngineDiagnostics(lastError = reason))
+    override val diagnostics: StateFlow<AudioEngineDiagnostics> = mutableDiagnostics.asStateFlow()
 
     override suspend fun initialize(config: PianoAudioConfig) {
-        mutableState.value = config.validationError()?.let(AudioEngineState::Error) ?: AudioEngineState.Error(reason)
+        val error = config.validationError() ?: reason
+        mutableState.value = AudioEngineState.Error(error)
+        mutableDiagnostics.value = AudioEngineDiagnostics(lastError = error)
     }
 
     override fun noteOn(note: Int, velocity: Int, channel: Int) = Unit

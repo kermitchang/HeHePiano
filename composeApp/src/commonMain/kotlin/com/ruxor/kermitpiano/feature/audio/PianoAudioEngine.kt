@@ -2,7 +2,7 @@ package com.ruxor.kermitpiano.feature.audio
 
 import kotlinx.coroutines.flow.StateFlow
 
-internal interface PianoAudioEngine {
+internal interface PianoAudioEngine : AudioDiagnosticsProvider {
     val state: StateFlow<AudioEngineState>
 
     suspend fun initialize(config: PianoAudioConfig)
