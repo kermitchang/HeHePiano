@@ -25,17 +25,23 @@ Launch the desktop application:
 
 The app starts in **Practice** mode. Use **Open MIDI** to choose an external file, or **Library** to select a song from `source/midi/`. Imported files are copied into the local library without replacing an existing file; name collisions receive a numeric suffix.
 
-## Local MIDI Library
+## Local Source Assets
 
-Place `.mid` or `.midi` files in `source/midi/`. The desktop app finds the project root from its working directory, scans the library at startup, and rescans it when **Refresh Library** is selected. Personal and third-party MIDI files are intentionally ignored by Git.
+The `source/` directory holds local assets used while developing and testing the desktop app. Asset binaries are intentionally excluded from Git; only their documentation and applicable licence text are tracked.
 
-## Piano Audio
+### `source/midi/`
 
-Audio is optional. The desktop backend uses one long-lived interactive [FluidSynth](https://www.fluidsynth.org/) process and a user-provided `.sf2` SoundFont. No sound bank is downloaded or committed automatically.
+This is the local MIDI library. Place `.mid` or `.midi` files here; the app finds the project root from its working directory, scans the library at startup, and rescans it when **Refresh Library** is selected. Files imported through **Open MIDI** are also copied here without replacing an existing filename.
+
+Personal and third-party MIDI files are ignored by Git. For a reproducible local parser and layout test, download Bach's *English Suite II: Prelude*, BWV 807 from [Mutopia Project](https://www.ibiblio.org/pub/multimedia/mutopia/BachJS/BWV807/bach-english-suite-2-prelude/) and save its MIDI file as `source/midi/Bach-BWV807-English-Suite-II-Prelude.mid`. Mutopia identifies this edition as `Mutopia-2008/06/17-84`, sourced from Bach-Gesellschaft and placed in the public domain.
+
+### `source/soundfonts/`
+
+This is the local SoundFont library used for piano audio. The desktop backend uses one long-lived interactive [FluidSynth](https://www.fluidsynth.org/) process and a user-provided `.sf2` SoundFont. No sound bank is committed automatically.
 
 1. Install FluidSynth yourself, for example on macOS: `brew install fluid-synth`.
-2. Put a licensed SoundFont at `source/soundfonts/piano.sf2`.
-3. Record its name, author, source URL, and licence in `source/soundfonts/LICENSE.example.txt`; retain a licence text such as `LICENSE-<name>.txt` when supplied.
+2. Download [GeneralUser GS](https://schristiancollins.com/generaluser.php) from its author, S. Christian Collins, and save the included `GeneralUser-GS.sf2` as `source/soundfonts/piano.sf2`.
+3. Keep the supplied licence as `source/soundfonts/LICENSE-GeneralUser-GS.txt`, and record the version, author, source URL, and licence in `source/soundfonts/LICENSE.example.txt`.
 
 To use a SoundFont stored elsewhere, set `KERMITPIANO_SOUNDFONT` before launching the app:
 

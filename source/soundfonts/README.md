@@ -1,7 +1,7 @@
 # SoundFonts
 
-KermitPiano supports a user-supplied `.sf2` SoundFont for piano audio. Put the default file at `source/soundfonts/piano.sf2`, or choose another `.sf2` path from Audio Settings when that UI is available.
+KermitPiano supports a user-supplied `.sf2` SoundFont for piano audio. Put the default file at `source/soundfonts/piano.sf2`, or supply another path through `KERMITPIANO_SOUNDFONT`.
 
-Only use a SoundFont whose licence permits your intended use. Keep its licence text beside the file or record it in `LICENSE.example.txt`. The application never downloads a SoundFont automatically.
+The recommended local bank is [GeneralUser GS](https://schristiancollins.com/generaluser.php) by S. Christian Collins. Download it yourself from the author's site, rename `GeneralUser-GS.sf2` to `piano.sf2`, retain its supplied licence as `LICENSE-GeneralUser-GS.txt`, and record the version and URL in `LICENSE.example.txt`.
 
 Large sound bank and sample files are intentionally ignored by Git.
