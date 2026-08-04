@@ -1,0 +1,11 @@
+.gradle/
+.idea/
+.kotlin/
+**/build/
+local.properties
+*.iml
+.DS_Store
+source/soundfonts/*.sf2
+source/soundfonts/*.sf3
+source/soundfonts/*.sfz
+source/soundfonts/**/*.wav
