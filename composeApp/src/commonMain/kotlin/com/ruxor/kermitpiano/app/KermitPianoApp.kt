@@ -69,6 +69,7 @@ import com.ruxor.kermitpiano.feature.audio.PlayerInputAudioRouter
 import com.ruxor.kermitpiano.feature.audio.playTestC4
 import com.ruxor.kermitpiano.feature.midi.MidiAnalysis
 import com.ruxor.kermitpiano.feature.midi.MidiAnalyzer
+import com.ruxor.kermitpiano.feature.midi.MidiInput
 import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
 import com.ruxor.kermitpiano.feature.midi.StandardMidiParser
 import com.ruxor.kermitpiano.feature.midi.TrackHand
@@ -99,6 +100,7 @@ internal fun KermitPianoApp(
     audioEngine: PianoAudioEngine = NoAudioEngine(),
     audioConfig: PianoAudioConfig = PianoAudioConfig(),
     audioStartupInfo: AudioStartupInfo = AudioStartupInfo("", null, null, emptyList(), null, null),
+    midiInput: MidiInput? = null,
 ) {
     val keyboardInputState by keyboardInput.state.collectAsState()
     val songRepository: SongRepository = remember { DemoSongRepository() }
@@ -152,6 +154,10 @@ internal fun KermitPianoApp(
                 KeyboardEventType.KeyUp -> playerAudioRouter.noteOff(event.note.value)
             }
         }
+        midiInput?.start(
+            onNoteOn = { note, _ -> playerAudioRouter.noteOn(note.value, velocity = 96) },
+            onNoteOff = { note -> playerAudioRouter.noteOff(note.value) },
+        )
     }
 
     LaunchedEffect(playbackController) {

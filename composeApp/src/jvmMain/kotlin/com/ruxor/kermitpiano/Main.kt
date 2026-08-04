@@ -5,6 +5,7 @@ import com.ruxor.kermitpiano.app.KermitPianoApp
 import com.ruxor.kermitpiano.feature.keyboardinput.KeyboardInput
 import com.ruxor.kermitpiano.feature.keyboardinput.handle
 import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
+import com.ruxor.kermitpiano.feature.midi.UsbMidiInput
 import com.ruxor.kermitpiano.feature.audio.FluidSynthPianoAudioEngine
 import com.ruxor.kermitpiano.feature.audio.PianoAudioConfig
 import com.ruxor.kermitpiano.feature.audio.SoundFontLocator
@@ -15,12 +16,16 @@ import java.io.File
 
 fun main() {
     val keyboardInput = KeyboardInput()
+    val usbMidiInput = UsbMidiInput(
+        onUnavailable = { message -> println("MIDI 輸入不可用: $message") },
+    )
     val startupInfo = SoundFontLocator.locate(configuredPath = null)
     val projectRoot = File(startupInfo.projectRoot ?: System.getProperty("user.dir"))
     val localMidiSource = LocalMidiDirectorySongSource(File(projectRoot, "source/midi"))
     val audioEngine = FluidSynthPianoAudioEngine()
     val audioConfig = PianoAudioConfig(soundFontPath = startupInfo.selectedSoundFontPath)
     println(startupInfo.toDebugLog())
+    println("可用 MIDI 裝置: ${UsbMidiInput.availableDevices()}")
 
     singleWindowApplication(
         title = "KermitPiano",
@@ -28,6 +33,7 @@ fun main() {
     ) {
         KermitPianoApp(
             keyboardInput = keyboardInput,
+            midiInput = usbMidiInput,
             openMidiFile = ::openMidiFile,
             localSongSource = localMidiSource,
             audioEngine = audioEngine,

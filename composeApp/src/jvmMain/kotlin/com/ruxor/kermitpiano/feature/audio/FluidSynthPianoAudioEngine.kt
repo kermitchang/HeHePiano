@@ -42,9 +42,15 @@ internal class FluidSynthPianoAudioEngine(
         try {
             val command = buildList {
                 add(executablePath)
-                if (System.getProperty("os.name").contains("mac", ignoreCase = true)) {
-                    add("-a")
-                    add("coreaudio")
+                when {
+                    System.getProperty("os.name").contains("mac", ignoreCase = true) -> {
+                        add("-a"); add("coreaudio")
+                    }
+                    System.getProperty("os.name").contains("linux", ignoreCase = true) -> {
+                        // Linux: prefer PipeWire if the pulse server is present, else plain ALSA.
+                        add("-a")
+                        add(if (detectPipeWireAvailable()) "pipewire" else "alsa")
+                    }
                 }
                 add("-g")
                 add(config.gain.toString())
@@ -127,6 +133,14 @@ internal class FluidSynthPianoAudioEngine(
             fail("FluidSynth exited unexpectedly ($exitCode)", mutableDiagnostics.value.soundFontPath, exitCode)
         }
     }
+
+    private fun detectPipeWireAvailable(): Boolean =
+        runCatching {
+            val runtimeDir = System.getenv("XDG_RUNTIME_DIR")
+            if (runtimeDir.isNullOrBlank()) return@runCatching false
+            val socket = File(runtimeDir, "pipewire-0")
+            socket.exists()
+        }.getOrDefault(false)
 
     private fun captureStderr(started: Process) {
         val stderr = started.errorStream.bufferedReader().use { it.readText().trim() }
