@@ -27,9 +27,7 @@ The app starts in **Practice** mode. Use **Open MIDI** to choose an external fil
 
 ## Local MIDI Library
 
-Place `.mid` or `.midi` files in `source/midi/`. The desktop app finds the project root from its working directory, scans the library at startup, and rescans it when **Refresh Library** is selected.
-
-The checked-in `FFVII - Tifas Theme [mk].mid` is a parser and layout test song.
+Place `.mid` or `.midi` files in `source/midi/`. The desktop app finds the project root from its working directory, scans the library at startup, and rescans it when **Refresh Library** is selected. Personal and third-party MIDI files are intentionally ignored by Git.
 
 ## Piano Audio
 

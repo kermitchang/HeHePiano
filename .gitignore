@@ -5,6 +5,9 @@
 local.properties
 *.iml
 .DS_Store
+# Personal or third-party MIDI files are not distributed with the project.
+source/midi/*.mid
+source/midi/*.midi
 # User-provided SoundFonts and their audio samples may be large or licence-restricted.
 source/soundfonts/*
 !source/soundfonts/README.md
