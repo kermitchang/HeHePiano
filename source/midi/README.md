@@ -1,6 +1,6 @@
 # Local MIDI Library
 
-Place personal `.mid` or `.midi` files in this directory. KermitPiano scans this folder at startup and when **Refresh Library** is selected. MIDI files are intentionally ignored by Git.
+Place personal `.mid` or `.midi` files in this directory. HeHePiano scans this folder at startup and when **Refresh Library** is selected. MIDI files are intentionally ignored by Git.
 
 Files imported from elsewhere can be copied here without overwriting an existing song; duplicate names receive a numeric suffix.
 

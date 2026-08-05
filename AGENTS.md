@@ -1,4 +1,4 @@
-# KermitPiano Engineering Rules
+# HeHePiano Engineering Rules
 
 These instructions apply to the entire repository.
 
@@ -13,10 +13,10 @@ These instructions apply to the entire repository.
 
 ## Package Rule
 
-- The root package is `com.ruxor.kermitpiano`.
+- The root package is `com.ruxor.hehepiano`.
 - Package names are lowercase, singular where natural, and describe capability rather than implementation technology.
-- Shared application composition belongs under `com.ruxor.kermitpiano.app`.
-- A future feature uses `com.ruxor.kermitpiano.feature.<feature>`; reusable infrastructure uses `com.ruxor.kermitpiano.core.<capability>`.
+- Shared application composition belongs under `com.ruxor.hehepiano.app`.
+- A future feature uses `com.ruxor.hehepiano.feature.<feature>`; reusable infrastructure uses `com.ruxor.hehepiano.core.<capability>`.
 - Platform-specific code keeps the same logical package as its shared counterpart when it implements that counterpart.
 - Never use catch-all packages such as `util`, `helpers`, `common`, or `misc`.
 

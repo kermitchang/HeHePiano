@@ -1,8 +1,8 @@
-# KermitPiano
+# HeHePiano
 
 > [**English**](README.md) | **繁體中文**
 
-KermitPiano 是一個以 **Kotlin Multiplatform + Compose Multiplatform** 打造的桌面鋼琴練習原型。它能匯入標準 MIDI 檔案（Standard MIDI Files），透過共用的 88 鍵佈局呈現樂譜，並支援 **練習（Practice）**、**跟譜（Follow Song）** 與 **完整 88 鍵（Full 88）** 三種檢視模式。
+HeHePiano 是一個以 **Kotlin Multiplatform + Compose Multiplatform** 打造的桌面鋼琴練習原型。它能匯入標準 MIDI 檔案（Standard MIDI Files），透過共用的 88 鍵佈局呈現樂譜，並支援 **練習（Practice）**、**跟譜（Follow Song）** 與 **完整 88 鍵（Full 88）** 三種檢視模式。
 
 ## 環境需求
 
@@ -39,13 +39,13 @@ KermitPiano 是一個以 **Kotlin Multiplatform + Compose Multiplatform** 打造
 2. 將具有合法授權的 SoundFont 放在 `source/soundfonts/piano.sf2`。
 3. 在 `source/soundfonts/LICENSE.example.txt` 記錄其名稱、作者、來源網址與授權；若供應商有提供授權文字（如 `LICENSE-<name>.txt`），請一併保留。
 
-若要使用存放在其他位置的 SoundFont，可在啟動前設定 `KERMITPIANO_SOUNDFONT`：
+若要使用存放在其他位置的 SoundFont，可在啟動前設定 `HEHEPIANO_SOUNDFONT`：
 
 ```shell
-KERMITPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
+HEHEPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
 ```
 
-查詢順序為：設定的路徑 → `kermitpiano.soundfont` JVM 屬性 → `KERMITPIANO_SOUNDFONT` 環境變數 → `source/soundfonts/piano.sf2` → 該目錄下其他有效的 `.sf2` 檔案。選定路徑與任何查詢失敗訊息都會在啟動時印出。音訊就緒後，可從 More 選單開啟 **Debug** 檢視音訊後端，並發送 **Test C4** 測試音。
+查詢順序為：設定的路徑 → `hehepiano.soundfont` JVM 屬性 → `HEHEPIANO_SOUNDFONT` 環境變數 → `source/soundfonts/piano.sf2` → 該目錄下其他有效的 `.sf2` 檔案。選定路徑與任何查詢失敗訊息都會在啟動時印出。音訊就緒後，可從 More 選單開啟 **Debug** 檢視音訊後端，並發送 **Test C4** 測試音。
 
 若缺少 FluidSynth 或 SoundFont，應用仍會以 NoAudio 模式正常運作，並顯示音訊狀態。`source/soundfonts/` 內所有內容（除目錄說明文件與 `LICENSE-*.txt` 外）都被 Git 忽略，避免意外提交有版權或授權限制的音訊資產。
 
@@ -133,7 +133,7 @@ Core domain
 - `TimelineEngine` 將單調遊戲時鐘、歌曲播放時間、速度、暫停/繼續、重啟與循環，與渲染邏輯分離。
 - `WaterfallRenderer` 使用單一 Canvas，只渲染時間排序後的可見音符。
 - `SongRepository` 提供具體化的 `Song` 物件，目前實作為 `DemoSongRepository`。
-- `KermitPianoStateHolder` 統一持有歌曲、播放、匯入、樂曲庫、視窗與除錯狀態；`KermitPianoApp` 只渲染唯讀 `StateFlow` 並分派具型別的動作。
+- `HeHePianoStateHolder` 統一持有歌曲、播放、匯入、樂曲庫、視窗與除錯狀態；`HeHePianoApp` 只渲染唯讀 `StateFlow` 並分派具型別的動作。
 - `PlayerInputTracker` 以來源分開計數並合併電腦鍵盤與 USB MIDI 音符，避免兩個來源重疊時過早釋放按鍵。
 - `AutoPlayScheduler` 是共用且可決定性的 MIDI 事件排程器；`AutoPlayOutput` 以小型邊界連接音訊與虛擬琴鍵狀態，領域層不依賴 FluidSynth。
 - Compose UI 已拆成 App shell、`PianoTopBar`、歌曲／匯入面板與共用視覺 token；業務規則不放在 composable 中。
@@ -141,7 +141,7 @@ Core domain
 ## 專案結構（Project Structure）
 
 ```text
-KermitPiano/
+HeHePiano/
 ├── composeApp/
 │   └── src/
 │       ├── commonMain/     共用 UI、功能與領域程式碼

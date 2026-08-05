@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================================
-# KermitPiano 啟動腳本（Pi4）
+# HeHePiano 啟動腳本（Pi4）
 # ============================================================================
 # 用法:
-#   ./run-piano.sh          啟動 KermitPiano（有螢幕時）
+#   ./run-piano.sh          啟動 HeHePiano（有螢幕時）
 #   ./run-piano.sh --build  只編譯不啟動
 #   ./run-piano.sh --headless  無螢幕模式（Xvfb + 軟體渲染）
 # ============================================================================
@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-arm64}"
 export PATH="$JAVA_HOME/bin:$PATH"
 
-echo "📦 KermitPiano Launcher (Pi4)"
+echo "📦 HeHePiano Launcher (Pi4)"
 echo "   JDK: $(java -version 2>&1 | head -1)"
 
 if [ "${1:-}" = "--build" ]; then
@@ -33,7 +33,7 @@ if [ "${1:-}" = "--headless" ]; then
     pgrep -f "Xvfb :99" >/dev/null || (Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &)
     export DISPLAY=:99
     export SKIKO_RENDER_API=SOFTWARE
-    echo "🎹 啟動 KermitPiano（軟體渲染）..."
+    echo "🎹 啟動 HeHePiano（軟體渲染）..."
     ./gradlew :composeApp:run --quiet
     exit 0
 fi
@@ -47,7 +47,7 @@ if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
 fi
 
 # 嘗試硬體渲染，失敗自動降級軟體渲染
-echo "🎹 啟動 KermitPiano（硬體渲染）..."
+echo "🎹 啟動 HeHePiano（硬體渲染）..."
 if ! ./gradlew :composeApp:run --quiet 2>&1; then
     echo "⚠️  硬體渲染失敗，改用軟體渲染..."
     export SKIKO_RENDER_API=SOFTWARE

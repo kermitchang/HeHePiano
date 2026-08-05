@@ -38,7 +38,7 @@ kotlin {
 
 compose.desktop {
     application {
-        mainClass = "com.ruxor.kermitpiano.MainKt"
+        mainClass = "com.ruxor.hehepiano.MainKt"
 
         nativeDistributions {
             targetFormats(
@@ -47,7 +47,7 @@ compose.desktop {
                 TargetFormat.Deb,
                 TargetFormat.Rpm,
             )
-            packageName = "KermitPiano"
+            packageName = "HeHePiano"
             packageVersion = "0.1.0"
         }
     }

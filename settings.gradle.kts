@@ -13,6 +13,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "KermitPiano"
+rootProject.name = "HeHePiano"
 
 include(":composeApp")

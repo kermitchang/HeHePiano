@@ -1,8 +1,8 @@
-# KermitPiano
+# HeHePiano
 
 > **English** | [**繁體中文**](README.zh-TW.md)
 
-KermitPiano is a Kotlin Multiplatform desktop piano-practice prototype built with Compose Multiplatform. It imports Standard MIDI Files, renders them through a shared 88-key layout, and supports Practice, Follow Song, and Full 88 views.
+HeHePiano is a Kotlin Multiplatform desktop piano-practice prototype built with Compose Multiplatform. It imports Standard MIDI Files, renders them through a shared 88-key layout, and supports Practice, Follow Song, and Full 88 views.
 
 ## Requirements
 
@@ -45,13 +45,13 @@ This is the local SoundFont library used for piano audio. The desktop backend us
 2. Download [GeneralUser GS](https://schristiancollins.com/generaluser.php) from its author, S. Christian Collins, and save the included `GeneralUser-GS.sf2` as `source/soundfonts/piano.sf2`.
 3. Keep the supplied licence as `source/soundfonts/LICENSE-GeneralUser-GS.txt`, and record the version, author, source URL, and licence in `source/soundfonts/LICENSE.example.txt`.
 
-To use a SoundFont stored elsewhere, set `KERMITPIANO_SOUNDFONT` before launching the app:
+To use a SoundFont stored elsewhere, set `HEHEPIANO_SOUNDFONT` before launching the app:
 
 ```shell
-KERMITPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
+HEHEPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
 ```
 
-The lookup order is the configured path, the `kermitpiano.soundfont` JVM property, `KERMITPIANO_SOUNDFONT`, `source/soundfonts/piano.sf2`, then another valid `.sf2` file in that directory. The selected path and any lookup failure are printed at startup. Enable **Debug** from the More menu to inspect the audio backend and send a **Test C4** note once audio is ready.
+The lookup order is the configured path, the `hehepiano.soundfont` JVM property, `HEHEPIANO_SOUNDFONT`, `source/soundfonts/piano.sf2`, then another valid `.sf2` file in that directory. The selected path and any lookup failure are printed at startup. Enable **Debug** from the More menu to inspect the audio backend and send a **Test C4** note once audio is ready.
 
 If FluidSynth or a SoundFont is missing, the app stays playable in NoAudio mode and shows its audio status. Everything in `source/soundfonts/` is intentionally ignored by Git except the directory documentation and `LICENSE-*.txt` files, preventing proprietary or licence-restricted audio assets from being committed accidentally.
 
@@ -139,7 +139,7 @@ Core domain
 - `TimelineEngine` keeps the monotonic game clock, song playback time, speed, pause/resume, restart, and looping separate from rendering.
 - `WaterfallRenderer` uses one Canvas and renders only visible notes from a time-sorted song.
 - `SongRepository` supplies materialized `Song` objects. `DemoSongRepository` is the current implementation.
-- `KermitPianoStateHolder` is the single owner for song, playback, import, library, viewport, and debug UI state; `KermitPianoApp` renders its read-only `StateFlow` and dispatches typed actions.
+- `HeHePianoStateHolder` is the single owner for song, playback, import, library, viewport, and debug UI state; `HeHePianoApp` renders its read-only `StateFlow` and dispatches typed actions.
 - `PlayerInputTracker` merges computer-keyboard and USB MIDI notes with per-source reference counting, so overlapping NoteOn/NoteOff events do not release a key that another source still holds.
 - `AutoPlayScheduler` is a shared, deterministic MIDI event scheduler; `AutoPlayOutput` is the small boundary that connects it to audio and virtual-key state without making the domain depend on FluidSynth.
 - Compose UI is split into the app shell, `PianoTopBar`, song/import panels, and shared visual tokens; business rules remain outside composables.
@@ -147,7 +147,7 @@ Core domain
 ## Project Structure
 
 ```text
-KermitPiano/
+HeHePiano/
 ├── composeApp/
 │   └── src/
 │       ├── commonMain/     Shared UI, features, and domain code
