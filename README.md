@@ -1,5 +1,7 @@
 # KermitPiano
 
+> **English** | [**繁體中文**](README.zh-TW.md)
+
 KermitPiano is a Kotlin Multiplatform desktop piano-practice prototype built with Compose Multiplatform. It imports Standard MIDI Files, renders them through a shared 88-key layout, and supports Practice, Follow Song, and Full 88 views.
 
 ## Requirements
@@ -74,6 +76,18 @@ Key-down events play the following MIDI notes. Releasing a key releases only tha
 | K | C5 | 72 |
 | L | D5 | 74 |
 
+## USB MIDI Keyboard Input (AK490 and others)
+
+Besides the computer keyboard, the app also reads from a **USB MIDI keyboard** (e.g. Midiplus AK490 Pro) via `javax.sound.midi`:
+
+- On startup it scans and connects to a MIDI device whose name contains `AK490` (tune the keyword via `deviceNameContains` in `UsbMidiInput`).
+- **NoteOn / NoteOff** events are routed to the audio engine immediately.
+- **Pitch Bend wheel** → pitch slide effect.
+- **Modulation wheel** → vibrato/tremolo effect (CC1).
+- The keyboard's **Octave + / - buttons** are handled in hardware by the keyboard itself; the app receives the already-shifted notes.
+
+If no MIDI keyboard is detected, the app starts normally and prints a notice to the startup log.
+
 ## Architecture
 
 The project currently has one `composeApp` module. It keeps business rules in shared `commonMain` code and places only the desktop entry point and Compose Desktop integration in `jvmMain`.
@@ -106,16 +120,27 @@ KermitPiano/
 │   └── src/
 │       ├── commonMain/     Shared UI, features, and domain code
 │       ├── commonTest/     Shared unit tests
-│       └── jvmMain/        Desktop entry point
+│       └── jvmMain/        Desktop entry point and JVM integration
 ├── gradle/                 Version catalog and wrapper support
+├── setup/
+│   └── run-piano-pi4.sh    Raspberry Pi 4 launcher script
 ├── AGENTS.md               Repository engineering rules
 └── README.md
+```
+
+### Raspberry Pi 4 Launch
+
+A Pi4-specific launcher is provided at `setup/run-piano-pi4.sh`:
+
+```shell
+./setup/run-piano-pi4.sh            # launch with a display (hardware rendering)
+./setup/run-piano-pi4.sh --headless # headless / SSH (Xvfb + software rendering)
+./setup/run-piano-pi4.sh --build    # build only, do not launch
 ```
 
 ## Future Plan
 
 - Persist the local song library and per-song track mappings.
-- Add USB MIDI input behind the existing input boundary.
 - Add a native audio backend after measured FluidSynth process latency is insufficient.
 - Extend the waterfall and practice feedback for larger songs.
-- Support Linux Desktop and Raspberry Pi 4 ARM64 alongside macOS Desktop.
+- Keep supporting Linux Desktop and Raspberry Pi 4 ARM64 alongside macOS Desktop.
