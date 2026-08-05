@@ -8,20 +8,26 @@ internal class PlayerInputAudioRouter(private val engine: PianoAudioEngine) {
             field = value
         }
 
+    var inputSuspended: Boolean = false
+        set(value) {
+            if (!field && value) engine.allNotesOff()
+            field = value
+        }
+
     fun noteOn(note: Int, velocity: Int, channel: Int = 0) {
-        if (enabled) engine.noteOn(note, velocity, channel)
+        if (enabled && !inputSuspended) engine.noteOn(note, velocity, channel)
     }
 
     fun noteOff(note: Int, channel: Int = 0) {
-        engine.noteOff(note, channel)
+        if (!inputSuspended) engine.noteOff(note, channel)
     }
 
     fun pitchBend(value: Int, channel: Int = 0) {
-        if (enabled) engine.pitchBend(value, channel)
+        if (enabled && !inputSuspended) engine.pitchBend(value, channel)
     }
 
     fun controlChange(controller: Int, value: Int, channel: Int = 0) {
-        if (enabled) engine.controlChange(controller, value, channel)
+        if (enabled && !inputSuspended) engine.controlChange(controller, value, channel)
     }
 
     fun onRestart() = engine.allNotesOff()

@@ -71,6 +71,28 @@ class PianoAudioEngineTest {
     }
 
     @Test
+    fun `suspending player input clears audio and ignores input until resumed`() {
+        val engine = FakePianoAudioEngine()
+        val router = PlayerInputAudioRouter(engine)
+
+        router.noteOn(60, 96)
+        router.inputSuspended = true
+        router.noteOn(62, 96)
+        router.noteOff(60)
+        router.inputSuspended = false
+        router.noteOn(64, 96)
+
+        assertEquals(
+            listOf(
+                AudioEvent.NoteOn(60, 96, 0),
+                AudioEvent.AllNotesOff,
+                AudioEvent.NoteOn(64, 96, 0),
+            ),
+            engine.events,
+        )
+    }
+
+    @Test
     fun `test C4 sends a note on then note off only when the engine is ready`() = runBlocking {
         val engine = FakePianoAudioEngine()
 

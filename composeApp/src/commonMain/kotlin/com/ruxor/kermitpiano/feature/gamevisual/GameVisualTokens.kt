@@ -3,6 +3,7 @@ package com.ruxor.kermitpiano.feature.gamevisual
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.ruxor.kermitpiano.core.music.MidiNote
+import com.ruxor.kermitpiano.core.song.PianoHand as SongPianoHand
 
 internal enum class PianoHand { Left, Right, Unassigned }
 
@@ -46,5 +47,10 @@ internal object GameVisualTokens {
         PianoHand.Left -> leftHand
         PianoHand.Right -> rightHand
         PianoHand.Unassigned -> unassigned
+    }
+
+    fun styleFor(note: MidiNote, hand: SongPianoHand): HandVisualStyle = when (hand) {
+        SongPianoHand.Left -> leftHand
+        SongPianoHand.Right -> rightHand
     }
 }

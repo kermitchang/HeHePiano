@@ -1,11 +1,17 @@
 package com.ruxor.kermitpiano.app
 
 import com.ruxor.kermitpiano.core.song.Song
+import com.ruxor.kermitpiano.core.song.PianoHand
 import com.ruxor.kermitpiano.core.song.SongRepository
 import com.ruxor.kermitpiano.core.timeline.GameClock
 import com.ruxor.kermitpiano.core.timeline.MonotonicGameClock
 import com.ruxor.kermitpiano.core.timeline.SongLoop
 import com.ruxor.kermitpiano.core.timeline.SongTime
+import com.ruxor.kermitpiano.core.timeline.PlaybackState
+import com.ruxor.kermitpiano.feature.autoplay.AutoPlayOutput
+import com.ruxor.kermitpiano.feature.autoplay.AutoPlayScheduler
+import com.ruxor.kermitpiano.feature.autoplay.AutoPlayState
+import com.ruxor.kermitpiano.feature.autoplay.NoAutoPlayOutput
 import com.ruxor.kermitpiano.feature.midi.MidiAnalyzer
 import com.ruxor.kermitpiano.feature.midi.MidiImportPolicy
 import com.ruxor.kermitpiano.feature.midi.MidiFileSelection
@@ -13,6 +19,7 @@ import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
 import com.ruxor.kermitpiano.feature.midi.StandardMidiParser
 import com.ruxor.kermitpiano.feature.playback.PlaybackAction
 import com.ruxor.kermitpiano.feature.playback.PlaybackController
+import com.ruxor.kermitpiano.feature.practice.PracticeMode
 import com.ruxor.kermitpiano.feature.songlibrary.LoadableSongSource
 import com.ruxor.kermitpiano.feature.songlibrary.SongFile
 import com.ruxor.kermitpiano.feature.songlibrary.SongSource
@@ -39,6 +46,7 @@ internal class KermitPianoStateHolder(
     private val gameClock: GameClock = MonotonicGameClock(),
     private val midiParser: StandardMidiParser = StandardMidiParser(),
     private val midiAnalyzer: MidiAnalyzer = MidiAnalyzer(),
+    private val autoPlayOutput: AutoPlayOutput = NoAutoPlayOutput,
     private val backgroundDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -49,6 +57,7 @@ internal class KermitPianoStateHolder(
         require(available.isNotEmpty()) { "KermitPiano requires at least one song." }
     }
     private var playbackController = createPlaybackController(songs.first())
+    private val autoPlayScheduler = AutoPlayScheduler()
     private var importJob: Job? = null
     private val mutableState = MutableStateFlow(
         KermitPianoUiState(
@@ -61,6 +70,7 @@ internal class KermitPianoStateHolder(
     val state: StateFlow<KermitPianoUiState> = mutableState.asStateFlow()
 
     init {
+        autoPlayScheduler.load(songs.first())
         if (localSongSource != null) dispatch(KermitPianoAction.RefreshLocalSongs)
     }
 
@@ -74,6 +84,8 @@ internal class KermitPianoStateHolder(
             KermitPianoAction.ShowLibrary -> update { it.copy(libraryVisible = true) }
             KermitPianoAction.HideLibrary -> update { it.copy(libraryVisible = false) }
             is KermitPianoAction.SetPlayerSoundEnabled -> update { it.copy(playerSoundEnabled = action.enabled) }
+            is KermitPianoAction.SetDemoMode -> setDemoMode(action.enabled)
+            is KermitPianoAction.SetPracticeMode -> setPracticeMode(action.mode)
             is KermitPianoAction.AnalyzeMidi -> analyzeMidi(action.file)
             is KermitPianoAction.LoadMidiFile -> loadMidiFile(action.selection)
             is KermitPianoAction.UpdateTrackMapping -> update { current ->
@@ -94,30 +106,132 @@ internal class KermitPianoStateHolder(
 
     fun close() {
         importJob = null
+        autoPlayOutput.stop()
         workScope.cancel()
     }
 
     private fun advanceFrame() {
+        val previousState = state.value
         playbackController.onFrame()
-        update { it.copy(playbackState = playbackController.state.value) }
+        var demoState = previousState.demoState
+        var playbackState = playbackController.state.value
+        if (shouldAutoPlay(previousState) && previousState.playbackState.playbackState == PlaybackState.Playing) {
+            val result = advanceAutoPlay(previousState.playbackState.songTime, playbackState.songTime)
+            if (result.completed) {
+                playbackController.dispatch(PlaybackAction.Pause)
+                playbackController.dispatch(PlaybackAction.Restart)
+                playbackState = playbackController.state.value
+                demoState = if (previousState.demoModeEnabled) AutoPlayState.Completed else AutoPlayState.Off
+            }
+        }
+        update { it.copy(playbackState = playbackState, demoState = demoState) }
     }
 
     private fun dispatchPlayback(action: PlaybackAction) {
+        val before = state.value
         playbackController.dispatch(action)
-        update { it.copy(playbackState = playbackController.state.value) }
+        val after = playbackController.state.value
+        var demoState = before.demoState
+        var playbackState = after
+        when (action) {
+            PlaybackAction.Play -> {
+                if (
+                    shouldAutoPlay(before) &&
+                    before.playbackState.playbackState != PlaybackState.Playing &&
+                    after.playbackState == PlaybackState.Playing
+                ) {
+                    autoPlayOutput.submit(autoPlayScheduler.startAt(after.songTime))
+                }
+                if (before.demoModeEnabled) {
+                    demoState = AutoPlayState.Playing
+                }
+            }
+            PlaybackAction.Pause -> {
+                autoPlayOutput.submit(autoPlayScheduler.pause())
+                if (before.demoModeEnabled) {
+                    demoState = AutoPlayState.Paused
+                }
+            }
+            PlaybackAction.Restart -> {
+                autoPlayOutput.submit(autoPlayScheduler.stop())
+                if (shouldAutoPlay(before) && after.playbackState == PlaybackState.Playing) {
+                    autoPlayOutput.submit(autoPlayScheduler.startAt(after.songTime))
+                    if (before.demoModeEnabled) {
+                        demoState = AutoPlayState.Playing
+                    }
+                } else if (before.demoModeEnabled) {
+                    demoState = AutoPlayState.Ready
+                }
+            }
+            is PlaybackAction.SetSpeed -> {
+                if (shouldAutoPlay(before) && before.playbackState.playbackState == PlaybackState.Playing) {
+                    val result = advanceAutoPlay(before.playbackState.songTime, after.songTime)
+                    if (result.completed) {
+                        playbackController.dispatch(PlaybackAction.Pause)
+                        playbackController.dispatch(PlaybackAction.Restart)
+                        playbackState = playbackController.state.value
+                        if (before.demoModeEnabled) {
+                            demoState = AutoPlayState.Completed
+                        }
+                    }
+                }
+            }
+        }
+        update { it.copy(playbackState = playbackState, demoState = demoState) }
+    }
+
+    private fun advanceAutoPlay(previous: SongTime, current: SongTime) =
+        autoPlayScheduler.advance(previous, current).also { result -> autoPlayOutput.submit(result.effects) }
+
+    private fun setDemoMode(enabled: Boolean) {
+        val current = state.value
+        if (enabled == current.demoModeEnabled) return
+        autoPlayOutput.submit(autoPlayScheduler.stop())
+        val nextState = current.copy(demoModeEnabled = enabled)
+        autoPlayScheduler.load(current.song, computerHands(nextState))
+        val isPlaying = current.playbackState.playbackState == PlaybackState.Playing
+        if (isPlaying && computerHands(nextState).isNotEmpty()) {
+            autoPlayOutput.submit(autoPlayScheduler.startAt(current.playbackState.songTime))
+        }
+        update {
+            it.copy(
+                demoModeEnabled = enabled,
+                demoState = when {
+                    !enabled -> AutoPlayState.Off
+                    isPlaying -> AutoPlayState.Playing
+                    else -> AutoPlayState.Ready
+                },
+            )
+        }
+    }
+
+    private fun setPracticeMode(mode: PracticeMode) {
+        val current = state.value
+        if (current.practiceMode == mode) return
+
+        autoPlayOutput.submit(autoPlayScheduler.stop())
+        val nextState = current.copy(practiceMode = mode)
+        autoPlayScheduler.load(current.song, computerHands(nextState))
+        if (current.playbackState.playbackState == PlaybackState.Playing && computerHands(nextState).isNotEmpty()) {
+            autoPlayOutput.submit(autoPlayScheduler.startAt(current.playbackState.songTime))
+        }
+        update { it.copy(practiceMode = mode) }
     }
 
     private fun selectNextSong() {
         importJob?.cancel()
         importJob = null
+        autoPlayOutput.stop()
         val current = state.value
         val index = current.librarySongs.indexOfFirst { it.id == current.song.id }
         val nextSong = current.librarySongs[(index + 1).mod(current.librarySongs.size)]
         playbackController = createPlaybackController(nextSong)
+        autoPlayScheduler.load(nextSong, computerHands(current))
         update {
             it.copy(
                 song = nextSong,
                 playbackState = playbackController.state.value,
+                demoState = if (it.demoModeEnabled) AutoPlayState.Ready else AutoPlayState.Off,
                 midiImport = MidiImportState.Idle,
                 trackMappings = emptyMap(),
                 errorMessage = null,
@@ -141,10 +255,12 @@ internal class KermitPianoStateHolder(
     }
 
     private fun markAnalyzing(fileName: String) {
+        autoPlayOutput.submit(autoPlayScheduler.stop())
         update {
             it.copy(
                 midiImport = MidiImportState.Analyzing(fileName),
                 trackMappings = emptyMap(),
+                practiceMode = PracticeMode.BothHands,
                 errorMessage = null,
             )
         }
@@ -171,12 +287,15 @@ internal class KermitPianoStateHolder(
         val current = state.value
         val analysis = (current.midiImport as? MidiImportState.Ready)?.analysis ?: return
         val playable = midiAnalyzer.import(analysis, current.trackMappings)
+        autoPlayOutput.stop()
         playbackController = createPlaybackController(playable.song)
+        autoPlayScheduler.load(playable.song, computerHands(current))
         update {
             it.copy(
                 librarySongs = it.librarySongs.filterNot { song -> song.id == playable.song.id } + playable.song,
                 song = playable.song,
                 playbackState = playbackController.state.value,
+                demoState = if (it.demoModeEnabled) AutoPlayState.Ready else AutoPlayState.Off,
                 midiImport = MidiImportState.Idle,
                 trackMappings = emptyMap(),
                 errorMessage = null,
@@ -219,6 +338,11 @@ internal class KermitPianoStateHolder(
         gameClock = gameClock,
         loop = SongLoop(start = SongTime.zero, endExclusive = song.duration),
     )
+
+    private fun shouldAutoPlay(state: KermitPianoUiState): Boolean = computerHands(state).isNotEmpty()
+
+    private fun computerHands(state: KermitPianoUiState): Set<PianoHand> =
+        if (state.demoModeEnabled) PianoHand.entries.toSet() else state.practiceMode.computerHands
 
     private fun launchImport(fileName: String, block: suspend () -> Unit) {
         importJob?.cancel()

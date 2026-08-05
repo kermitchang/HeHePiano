@@ -4,6 +4,7 @@ import com.ruxor.kermitpiano.feature.midi.MidiFileSelection
 import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
 import com.ruxor.kermitpiano.feature.midi.TrackHand
 import com.ruxor.kermitpiano.feature.pianolayout.PianoViewportMode
+import com.ruxor.kermitpiano.feature.practice.PracticeMode
 import com.ruxor.kermitpiano.feature.playback.PlaybackAction
 import com.ruxor.kermitpiano.feature.songlibrary.SongFile
 
@@ -23,6 +24,10 @@ internal sealed interface KermitPianoAction {
     data object HideLibrary : KermitPianoAction
 
     data class SetPlayerSoundEnabled(val enabled: Boolean) : KermitPianoAction
+
+    data class SetDemoMode(val enabled: Boolean) : KermitPianoAction
+
+    data class SetPracticeMode(val mode: PracticeMode) : KermitPianoAction
 
     data class AnalyzeMidi(val file: SelectedMidiFile) : KermitPianoAction
 

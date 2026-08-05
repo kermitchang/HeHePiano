@@ -17,4 +17,17 @@ class WaterfallProjectorTest {
 
         assertEquals(WaterfallPosition(160f), position)
     }
+
+    @Test
+    fun `note span height follows MIDI duration`() {
+        val projector = WaterfallProjector(pixelsPerSecond = 80f)
+
+        val span = projector.spanAt(
+            noteTime = SongTime(3.seconds),
+            duration = 2.seconds,
+            songTime = SongTime(5.seconds),
+        )
+
+        assertEquals(WaterfallNoteSpan(topY = 0f, bottomY = 160f), span)
+    }
 }

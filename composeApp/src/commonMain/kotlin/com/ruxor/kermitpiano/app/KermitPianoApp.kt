@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ruxor.kermitpiano.core.playerinput.PlayerInputSource
+import com.ruxor.kermitpiano.feature.audio.AudioEngineState
 import com.ruxor.kermitpiano.feature.audio.AudioStartupInfo
 import com.ruxor.kermitpiano.feature.audio.NoAudioEngine
 import com.ruxor.kermitpiano.feature.audio.PianoAudioConfig
@@ -68,15 +69,20 @@ internal fun KermitPianoApp(
     val keyboardInputState by keyboardInput.state.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val songRepository = remember { DemoSongRepository() }
-    val stateHolder = remember(songRepository, localSongSource, coroutineScope) {
+    val playerInputTracker = keyboardInput.playerInputTracker
+    val autoPlayOutput = remember(audioEngine, playerInputTracker) {
+        PianoAutoPlayOutput(audioEngine, playerInputTracker)
+    }
+    val stateHolder = remember(songRepository, localSongSource, coroutineScope, autoPlayOutput) {
         KermitPianoStateHolder(
             songRepository = songRepository,
             parentScope = coroutineScope,
             localSongSource = localSongSource,
+            autoPlayOutput = autoPlayOutput,
         )
     }
     val appState by stateHolder.state.collectAsState()
-    val playerInputState by keyboardInput.playerInputTracker.state.collectAsState()
+    val playerInputState by playerInputTracker.state.collectAsState()
     val playerAudioRouter = remember(audioEngine) { PlayerInputAudioRouter(audioEngine) }
     val audioState by audioEngine.state.collectAsState()
     val audioDiagnostics by audioEngine.diagnostics.collectAsState()
@@ -96,7 +102,9 @@ internal fun KermitPianoApp(
     }
 
     SideEffect {
+        keyboardInput.enabled = !appState.demoModeEnabled
         playerAudioRouter.enabled = appState.playerSoundEnabled
+        playerAudioRouter.inputSuspended = appState.demoModeEnabled
     }
 
     LaunchedEffect(audioEngine, audioConfig) {
@@ -119,11 +127,13 @@ internal fun KermitPianoApp(
         }
         midiInput?.start(
             onNoteOn = { note, velocity ->
-                keyboardInput.playerInputTracker.noteOn(PlayerInputSource.UsbMidi, note)
+                if (playerAudioRouter.inputSuspended) return@start
+                playerInputTracker.noteOn(PlayerInputSource.UsbMidi, note)
                 playerAudioRouter.noteOn(note.value, velocity = velocity)
             },
             onNoteOff = { note ->
-                keyboardInput.playerInputTracker.noteOff(PlayerInputSource.UsbMidi, note)
+                if (playerAudioRouter.inputSuspended) return@start
+                playerInputTracker.noteOff(PlayerInputSource.UsbMidi, note)
                 playerAudioRouter.noteOff(note.value)
             },
             onPitchBend = { value -> playerAudioRouter.pitchBend(value) },
@@ -134,7 +144,8 @@ internal fun KermitPianoApp(
             keyboardInput.releaseAll()
             keyboardInput.clearEventListener()
             midiInput?.stop()
-            keyboardInput.playerInputTracker.releaseAll(PlayerInputSource.UsbMidi)
+            playerInputTracker.releaseAll(PlayerInputSource.UsbMidi)
+            autoPlayOutput.stop()
         }
     }
 
@@ -154,7 +165,7 @@ internal fun KermitPianoApp(
                     onPlaybackAction = { action ->
                         if (action == PlaybackAction.Restart) {
                             keyboardInput.releaseAll()
-                            keyboardInput.playerInputTracker.releaseAll(PlayerInputSource.UsbMidi)
+                            playerInputTracker.releaseAll(PlayerInputSource.UsbMidi)
                             playerAudioRouter.onRestart()
                         }
                         stateHolder.dispatch(KermitPianoAction.Playback(action))
@@ -163,6 +174,17 @@ internal fun KermitPianoApp(
                     onViewportModeChanged = { stateHolder.dispatch(KermitPianoAction.SetViewportMode(it)) },
                     debugVisible = appState.debugVisible,
                     onDebugChanged = { stateHolder.dispatch(KermitPianoAction.ToggleDebug) },
+                    demoModeEnabled = appState.demoModeEnabled,
+                    demoState = appState.demoState,
+                    audioReady = audioState is AudioEngineState.Ready,
+                    onDemoModeChanged = { enabled ->
+                        if (enabled) {
+                            keyboardInput.releaseAll()
+                            playerInputTracker.releaseAll(PlayerInputSource.UsbMidi)
+                        }
+                        playerAudioRouter.inputSuspended = enabled
+                        stateHolder.dispatch(KermitPianoAction.SetDemoMode(enabled))
+                    },
                     onOpenMidi = {
                         requestMidiImport(openMidiFile) { selected ->
                             stateHolder.dispatch(KermitPianoAction.LoadMidiFile(selected))
@@ -171,7 +193,7 @@ internal fun KermitPianoApp(
                     songTitle = appState.song.title,
                     onSelectNextSong = {
                         keyboardInput.releaseAll()
-                        keyboardInput.playerInputTracker.releaseAll(PlayerInputSource.UsbMidi)
+                        playerInputTracker.releaseAll(PlayerInputSource.UsbMidi)
                         playerAudioRouter.onSongChanged()
                         stateHolder.dispatch(KermitPianoAction.SelectNextSong)
                     },
@@ -233,8 +255,12 @@ internal fun KermitPianoApp(
                         is MidiImportState.Ready -> MidiAnalysisPanel(
                             analysis = importState.analysis,
                             mappings = appState.trackMappings,
+                            practiceMode = appState.practiceMode,
                             onMappingChanged = { index, hand ->
                                 stateHolder.dispatch(KermitPianoAction.UpdateTrackMapping(index, hand))
+                            },
+                            onPracticeModeChanged = { mode ->
+                                stateHolder.dispatch(KermitPianoAction.SetPracticeMode(mode))
                             },
                             onCancel = { stateHolder.dispatch(KermitPianoAction.CancelMidiAnalysis) },
                             onImport = { stateHolder.dispatch(KermitPianoAction.ImportAnalyzedMidi) },

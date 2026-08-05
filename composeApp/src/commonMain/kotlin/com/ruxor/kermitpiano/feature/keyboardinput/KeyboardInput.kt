@@ -17,6 +17,12 @@ internal class KeyboardInput(
     val state: StateFlow<KeyboardInputState> = mutableState.asStateFlow()
     private var eventListener: (KeyboardEvent) -> Unit = {}
 
+    var enabled: Boolean = true
+        set(value) {
+            if (field && !value) releaseAll()
+            field = value
+        }
+
     fun setEventListener(listener: (KeyboardEvent) -> Unit) {
         eventListener = listener
     }
@@ -26,6 +32,7 @@ internal class KeyboardInput(
     }
 
     fun onKeyDown(key: PianoKeyboardKey) {
+        if (!enabled) return
         if (key in pressedKeys) return
         val note = MidiNote(key.midiValueAt(octave))
         pressedKeys[key] = note
@@ -35,6 +42,7 @@ internal class KeyboardInput(
     }
 
     fun onKeyUp(key: PianoKeyboardKey) {
+        if (!enabled) return
         val note = pressedKeys.remove(key) ?: return
         playerInputTracker.noteOff(PlayerInputSource.ComputerKeyboard, note)
 

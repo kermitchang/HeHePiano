@@ -25,7 +25,7 @@ KermitPiano 是一個以 **Kotlin Multiplatform + Compose Multiplatform** 打造
 ./gradlew :composeApp:run
 ```
 
-應用程式預設以 **練習（Practice）** 模式啟動。可使用 **Open MIDI** 選擇外部檔案，或透過 **Library** 從 `source/midi/` 挑選歌曲。匯入的檔案會複製到本地樂曲庫，不會覆蓋既有檔案；若檔名重複，會自動加上數字後綴。
+應用程式預設以 **練習（Practice）** 模式啟動。可使用 **Open MIDI** 選擇外部檔案，或透過 **Library** 從 `source/midi/` 挑選歌曲；已存在於本地樂曲庫的檔案會在啟動時掃描，也可以重複分析。
 
 ## 本地 MIDI 樂曲庫
 
@@ -52,6 +52,28 @@ KERMITPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
 ## MIDI 匯入安全性
 
 按下 **Open MIDI** 後會先選取檔案，再於 UI 執行緒之外讀取與解析。空檔案及超過 16 MiB 的檔案會在解析前拒絕；介面明確呈現 `Analyzing`、`Ready` 與 `Failure` 狀態，格式錯誤或無法讀取時會顯示可處理的錯誤，不會阻塞播放或讓應用程式崩潰。音軌左右手對應只會在分析完成後套用。
+
+## Demo 模式（自動演奏）
+
+MIDI 歌曲匯入後，確認音訊就緒，開啟 **Demo Mode** 再按 **Play**。程式會沿用瀑布流使用的同一條播放時間軸，將未標記為 `Ignore` 的 MIDI 音符排程，並把 NoteOn／NoteOff 送到鋼琴音訊引擎。匯入時會保留音符長度、力度與 MIDI channel，因此可以正確聽到和弦與延音，而不是固定長度的單音。暫停、重播、速度調整、切換歌曲與歌曲結束時，都會安全釋放自動演奏中的音符。
+
+Demo 模式開啟期間會暫停電腦鍵盤與 USB MIDI 輸入，避免手動彈奏干擾自動演奏。第一版會以目前設定的鋼琴 SoundFont 播放所有選取的 MIDI channel；延音踏板、各 channel 專用音色、彎音與其他控制器自動化留待後續擴充。
+
+## 左右手練習與自動伴奏
+
+MIDI Analysis 面板新增 **Practice Part**：**Left Hand**、**Right Hand**、**Both Hands**。音軌上的 `LEFT`／`RIGHT`／`IGNORE` 仍負責定義音軌內容屬於哪隻手；Practice Part 則決定演奏者與電腦各自負責什麼：
+
+- **Left Hand**：使用者彈左手，電腦自動彈右手伴奏。
+- **Right Hand**：使用者彈右手，電腦自動彈左手伴奏。
+- **Both Hands**：使用者彈雙手，不啟用自動伴奏。
+
+既有的 **Demo Mode** 仍是完整自動演奏模式：電腦彈奏雙手並暫停手動輸入。匯入後的 `SongNote` 會保留左右手、力度、MIDI channel、開始時間與音符長度。
+
+第一版預期左右手內容已分在不同 MIDI 音軌；同一音軌混合左右手的 MIDI，仍需要之後的逐音符拆分規則。
+
+## 瀑布音符長度
+
+瀑布區塊會依 MIDI NoteOn 到 NoteOff 的 duration 繪製。短音符會是短區塊，延音音符會是長區塊；區塊底端在 NoteOn 時抵達判定線，頂端在 NoteOff 時抵達判定線。極短音符仍會保留最小高度以維持可見性。
 
 ## 鍵盤對應（Keyboard Mapping）
 
@@ -96,6 +118,7 @@ Compose UI (app)
     ├── state holder/actions 狀態持有者與動作
     ├── keyboard input     鍵盤輸入（電腦鍵盤 + USB MIDI 琴）
     ├── playback controls  播放控制
+    ├── demo scheduler      Demo 自動演奏排程
     ├── waterfall renderer 瀑布流譜面
     └── virtual piano      虛擬鋼琴
             │
@@ -112,6 +135,7 @@ Core domain
 - `SongRepository` 提供具體化的 `Song` 物件，目前實作為 `DemoSongRepository`。
 - `KermitPianoStateHolder` 統一持有歌曲、播放、匯入、樂曲庫、視窗與除錯狀態；`KermitPianoApp` 只渲染唯讀 `StateFlow` 並分派具型別的動作。
 - `PlayerInputTracker` 以來源分開計數並合併電腦鍵盤與 USB MIDI 音符，避免兩個來源重疊時過早釋放按鍵。
+- `AutoPlayScheduler` 是共用且可決定性的 MIDI 事件排程器；`AutoPlayOutput` 以小型邊界連接音訊與虛擬琴鍵狀態，領域層不依賴 FluidSynth。
 - Compose UI 已拆成 App shell、`PianoTopBar`、歌曲／匯入面板與共用視覺 token；業務規則不放在 composable 中。
 
 ## 專案結構（Project Structure）

@@ -1,10 +1,18 @@
 package com.ruxor.kermitpiano.app
 
+import com.ruxor.kermitpiano.core.music.MidiNote
+import com.ruxor.kermitpiano.core.timeline.GameClock
+import com.ruxor.kermitpiano.core.timeline.GameTime
+import com.ruxor.kermitpiano.core.timeline.PlaybackSpeed
+import com.ruxor.kermitpiano.feature.autoplay.AutoPlayEffect
+import com.ruxor.kermitpiano.feature.autoplay.AutoPlayOutput
+import com.ruxor.kermitpiano.feature.autoplay.AutoPlayState
 import com.ruxor.kermitpiano.feature.midi.MidiFileSelection
 import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
 import com.ruxor.kermitpiano.feature.midi.TrackHand
 import com.ruxor.kermitpiano.feature.pianolayout.PianoViewportMode
 import com.ruxor.kermitpiano.feature.playback.PlaybackAction
+import com.ruxor.kermitpiano.feature.practice.PracticeMode
 import com.ruxor.kermitpiano.feature.song.DemoSongRepository
 import com.ruxor.kermitpiano.feature.songlibrary.LoadableSongSource
 import com.ruxor.kermitpiano.feature.songlibrary.SongFile
@@ -17,6 +25,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class KermitPianoStateHolderTest {
     @Test
@@ -54,6 +64,134 @@ class KermitPianoStateHolderTest {
     }
 
     @Test
+    fun `demo mode schedules notes from the shared playback timeline`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val clock = MutableGameClock()
+        val output = RecordingAutoPlayOutput()
+        val holder = KermitPianoStateHolder(
+            songRepository = DemoSongRepository(),
+            parentScope = scope,
+            gameClock = clock,
+            autoPlayOutput = output,
+            analysisDispatcher = Dispatchers.Unconfined,
+        )
+
+        try {
+            holder.dispatch(KermitPianoAction.SetDemoMode(true))
+            assertEquals(AutoPlayState.Ready, holder.state.value.demoState)
+
+            holder.dispatch(KermitPianoAction.Playback(PlaybackAction.Play))
+            assertEquals(AutoPlayState.Playing, holder.state.value.demoState)
+            assertEquals(
+                listOf<AutoPlayEffect>(AutoPlayEffect.NoteOn(MidiNote(60), 96, 0)),
+                output.effects,
+            )
+
+            clock.elapsed = 1.seconds
+            holder.dispatch(KermitPianoAction.FrameAdvanced)
+            assertEquals(
+                listOf<AutoPlayEffect>(
+                    AutoPlayEffect.NoteOn(MidiNote(60), 96, 0),
+                    AutoPlayEffect.NoteOff(MidiNote(60), 0),
+                    AutoPlayEffect.NoteOn(MidiNote(62), 96, 0),
+                ),
+                output.effects,
+            )
+
+            holder.dispatch(KermitPianoAction.Playback(PlaybackAction.Pause))
+            assertEquals(AutoPlayState.Paused, holder.state.value.demoState)
+            assertEquals(AutoPlayEffect.AllNotesOff, output.effects.last())
+        } finally {
+            holder.close()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `demo catches up crossed notes before changing speed`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val clock = MutableGameClock()
+        val output = RecordingAutoPlayOutput()
+        val holder = KermitPianoStateHolder(
+            songRepository = DemoSongRepository(),
+            parentScope = scope,
+            gameClock = clock,
+            autoPlayOutput = output,
+            analysisDispatcher = Dispatchers.Unconfined,
+        )
+
+        try {
+            holder.dispatch(KermitPianoAction.SetDemoMode(true))
+            holder.dispatch(KermitPianoAction.Playback(PlaybackAction.Play))
+            clock.elapsed = 1.seconds
+            holder.dispatch(KermitPianoAction.Playback(PlaybackAction.SetSpeed(PlaybackSpeed(0.5))))
+
+            assertEquals(
+                listOf<AutoPlayEffect>(
+                    AutoPlayEffect.NoteOn(MidiNote(60), 96, 0),
+                    AutoPlayEffect.NoteOff(MidiNote(60), 0),
+                    AutoPlayEffect.NoteOn(MidiNote(62), 96, 0),
+                ),
+                output.effects,
+            )
+            assertEquals(AutoPlayState.Playing, holder.state.value.demoState)
+        } finally {
+            holder.close()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `left hand practice auto plays only the right hand`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val clock = MutableGameClock()
+        val output = RecordingAutoPlayOutput()
+        val holder = KermitPianoStateHolder(
+            songRepository = DemoSongRepository(),
+            parentScope = scope,
+            gameClock = clock,
+            autoPlayOutput = output,
+        )
+
+        try {
+            holder.dispatch(KermitPianoAction.SetPracticeMode(PracticeMode.LeftHand))
+            holder.dispatch(KermitPianoAction.Playback(PlaybackAction.Play))
+            assertTrue(output.effects.isEmpty())
+
+            clock.elapsed = 3.seconds
+            holder.dispatch(KermitPianoAction.FrameAdvanced)
+
+            assertTrue(output.effects.contains(AutoPlayEffect.NoteOn(MidiNote(65), 96, 0)))
+            assertEquals(PracticeMode.LeftHand, holder.state.value.practiceMode)
+        } finally {
+            holder.close()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `both hands practice does not start computer accompaniment`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val output = RecordingAutoPlayOutput()
+        val holder = KermitPianoStateHolder(
+            songRepository = DemoSongRepository(),
+            parentScope = scope,
+            autoPlayOutput = output,
+        )
+
+        try {
+            holder.dispatch(KermitPianoAction.SetPracticeMode(PracticeMode.LeftHand))
+            holder.dispatch(KermitPianoAction.SetPracticeMode(PracticeMode.BothHands))
+            holder.dispatch(KermitPianoAction.Playback(PlaybackAction.Play))
+
+            assertTrue(output.effects.isEmpty())
+        } finally {
+            holder.close()
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun `MIDI analysis and import are state owner actions`() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val holder = KermitPianoStateHolder(
@@ -70,6 +208,12 @@ class KermitPianoStateHolderTest {
             assertEquals(1, analysis.noteCount)
             assertEquals(TrackHand.Right, holder.state.value.trackMappings[0])
 
+            holder.dispatch(KermitPianoAction.UpdateTrackMapping(0, TrackHand.Left))
+            holder.dispatch(KermitPianoAction.ImportAnalyzedMidi)
+
+            assertEquals(com.ruxor.kermitpiano.core.song.PianoHand.Left, holder.state.value.song.notes.first().hand)
+
+            holder.dispatch(KermitPianoAction.AnalyzeMidi(SelectedMidiFile("scale.mid", scaleMidi())))
             holder.dispatch(KermitPianoAction.UpdateTrackMapping(0, TrackHand.Ignore))
             holder.dispatch(KermitPianoAction.ImportAnalyzedMidi)
 
@@ -176,6 +320,25 @@ class KermitPianoStateHolderTest {
             0, 0, 0, track.size.toByte(),
         )
         return header + chunk + track
+    }
+}
+
+private class MutableGameClock : GameClock {
+    var elapsed: Duration = Duration.ZERO
+
+    override fun now(): GameTime = GameTime(elapsed)
+}
+
+private class RecordingAutoPlayOutput : AutoPlayOutput {
+    val effects = mutableListOf<AutoPlayEffect>()
+    var stopCount = 0
+
+    override fun submit(effects: List<AutoPlayEffect>) {
+        this.effects += effects
+    }
+
+    override fun stop() {
+        stopCount += 1
     }
 }
 

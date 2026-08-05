@@ -47,7 +47,7 @@ private fun DrawScope.drawWaterfall(
     guideColor: Color,
     judgementLineColor: Color,
 ) {
-    val noteHeight = noteHeightDp.toPx()
+    val minimumNoteHeight = minimumNoteHeightDp.toPx()
     val cornerRadius = noteCornerRadius.toPx()
     val pixelsPerSecond = size.height / VISIBLE_SECONDS
     val projector = WaterfallProjector(pixelsPerSecond = pixelsPerSecond)
@@ -57,7 +57,7 @@ private fun DrawScope.drawWaterfall(
             .coerceAtLeast(Duration.ZERO),
     )
     val lastVisibleTime = SongTime(
-        elapsed = songTime.elapsed + ((judgementLineY + noteHeight) / pixelsPerSecond).toDouble().seconds,
+        elapsed = songTime.elapsed + (judgementLineY / pixelsPerSecond).toDouble().seconds,
     )
 
     pianoLayout.keys.forEach { keyLayout ->
@@ -69,29 +69,32 @@ private fun DrawScope.drawWaterfall(
         )
     }
 
-    noteIndex.indicesBetween(firstVisibleTime, lastVisibleTime).forEach { index ->
+    noteIndex.visibleIndicesBetween(firstVisibleTime, lastVisibleTime).forEach { index ->
         val note = noteIndex.noteAt(index)
         val keyLayout = pianoLayout.keyFor(note.note.value) ?: return@forEach
-        val y = judgementLineY + projector.positionAt(noteTime = note.songTime, songTime = songTime).y
+        val span = projector.spanAt(note.songTime, note.duration, songTime)
+        val bottomY = judgementLineY + span.bottomY
+        val durationHeight = (span.bottomY - span.topY).coerceAtLeast(minimumNoteHeight)
+        val topY = bottomY - durationHeight
         val noteWidth = keyLayout.keyRect.width * if (keyLayout.zOrder > 0f) BLACK_NOTE_WIDTH_RATIO else NOTE_WIDTH_RATIO
-        val visualStyle = GameVisualTokens.styleFor(note.note)
+        val visualStyle = GameVisualTokens.styleFor(note.note, note.hand)
 
         drawRoundRect(
             color = visualStyle.glowColor,
-            topLeft = Offset(x = keyLayout.centerX - noteWidth / 2f - glowInset.toPx(), y = y - glowInset.toPx()),
-            size = Size(width = noteWidth + glowInset.toPx() * 2f, height = noteHeight + glowInset.toPx() * 2f),
+            topLeft = Offset(x = keyLayout.centerX - noteWidth / 2f - glowInset.toPx(), y = topY - glowInset.toPx()),
+            size = Size(width = noteWidth + glowInset.toPx() * 2f, height = durationHeight + glowInset.toPx() * 2f),
             cornerRadius = CornerRadius(cornerRadius + glowInset.toPx()),
         )
         drawRoundRect(
             brush = visualStyle.noteBrush(),
-            topLeft = Offset(x = keyLayout.centerX - noteWidth / 2f, y = y),
-            size = Size(width = noteWidth, height = noteHeight),
+            topLeft = Offset(x = keyLayout.centerX - noteWidth / 2f, y = topY),
+            size = Size(width = noteWidth, height = durationHeight),
             cornerRadius = CornerRadius(cornerRadius),
         )
         drawLine(
             color = visualStyle.borderColor,
-            start = Offset(keyLayout.centerX - noteWidth / 2f + highlightInset.toPx(), y + highlightInset.toPx()),
-            end = Offset(keyLayout.centerX + noteWidth / 2f - highlightInset.toPx(), y + highlightInset.toPx()),
+            start = Offset(keyLayout.centerX - noteWidth / 2f + highlightInset.toPx(), topY + highlightInset.toPx()),
+            end = Offset(keyLayout.centerX + noteWidth / 2f - highlightInset.toPx(), topY + highlightInset.toPx()),
             strokeWidth = highlightStroke.toPx(),
         )
     }
@@ -108,7 +111,7 @@ private fun DrawScope.drawWaterfall(
 private const val VISIBLE_SECONDS = 4f
 private const val NOTE_WIDTH_RATIO = 0.68f
 private const val BLACK_NOTE_WIDTH_RATIO = 0.82f
-private val noteHeightDp = 36.dp
+private val minimumNoteHeightDp = 8.dp
 private val noteCornerRadius = 7.dp
 private val judgementLineInset = 12.dp
 private val guideLineWidth = 1.dp

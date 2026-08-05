@@ -25,7 +25,7 @@ Launch the desktop application:
 ./gradlew :composeApp:run
 ```
 
-The app starts in **Practice** mode. Use **Open MIDI** to choose an external file, or **Library** to select a song from `source/midi/`. Imported files are copied into the local library without replacing an existing file; name collisions receive a numeric suffix.
+The app starts in **Practice** mode. Use **Open MIDI** to choose an external file, or **Library** to select a song from `source/midi/`. Files already in the local library are scanned at startup and can be analyzed repeatedly.
 
 ## Local Source Assets
 
@@ -33,7 +33,7 @@ The `source/` directory holds local assets used while developing and testing the
 
 ### `source/midi/`
 
-This is the local MIDI library. Place `.mid` or `.midi` files here; the app finds the project root from its working directory, scans the library at startup, and rescans it when **Refresh Library** is selected. Files imported through **Open MIDI** are also copied here without replacing an existing filename.
+This is the local MIDI library. Place `.mid` or `.midi` files here; the app finds the project root from its working directory, scans the library at startup, and rescans it when **Refresh Library** is selected. Files chosen through **Open MIDI** are analyzed for the current session; persistence into this directory is not automatic.
 
 Personal and third-party MIDI files are ignored by Git. For a reproducible local parser and layout test, download Bach's *English Suite II: Prelude*, BWV 807 from [Mutopia Project](https://www.ibiblio.org/pub/multimedia/mutopia/BachJS/BWV807/bach-english-suite-2-prelude/) and save its MIDI file as `source/midi/Bach-BWV807-English-Suite-II-Prelude.mid`. Mutopia identifies this edition as `Mutopia-2008/06/17-84`, sourced from Bach-Gesellschaft and placed in the public domain.
 
@@ -58,6 +58,28 @@ If FluidSynth or a SoundFont is missing, the app stays playable in NoAudio mode 
 ## MIDI Import Safety
 
 **Open MIDI** first selects a file, then loads and parses it off the UI thread. Empty files and files larger than 16 MiB are rejected before parsing. The UI exposes `Analyzing`, `Ready`, and `Failure` states, so a malformed or unreadable file reports an actionable error without blocking playback or crashing the application. Track hand mappings are only applied after the analysis is ready.
+
+## Demo Mode
+
+When a MIDI song has been imported, enable **Demo Mode** after audio is ready and press **Play**. The app schedules the selected (non-`Ignore`) MIDI notes against the same playback timeline used by the waterfall, then sends NoteOn and NoteOff events to the piano audio engine. Imported note duration, velocity, and MIDI channel are preserved, so chords and note lengths are heard instead of a sequence of fixed-length beeps. Pause, Restart, speed changes, song changes, and the end of the song release all demo notes safely.
+
+While Demo Mode is enabled, computer-keyboard and USB-MIDI input is suspended so manual notes cannot interfere with the automatic performance. The first version renders every selected MIDI channel through the configured piano SoundFont; sustain pedals, program-specific instruments, pitch bend, and other controller automation remain future extensions.
+
+## Hand Practice and Accompaniment
+
+The MIDI Analysis panel has a **Practice Part** selector: **Left Hand**, **Right Hand**, or **Both Hands**. Track mappings still decide whether each MIDI track is `LEFT`, `RIGHT`, or `IGNORE`; the practice selection decides who performs the mapped notes:
+
+- **Left Hand**: the player performs left-hand notes while the computer accompanies with right-hand notes.
+- **Right Hand**: the player performs right-hand notes while the computer accompanies with left-hand notes.
+- **Both Hands**: the player performs both hands and automatic accompaniment is disabled.
+
+The existing **Demo Mode** remains a full-song mode: it plays both hands and suspends manual input. Imported `SongNote` values retain their mapped hand, velocity, MIDI channel, start time, and duration.
+
+This first version expects left- and right-hand material to be assigned to separate MIDI tracks. A track that mixes both hands still needs a future note-splitting policy.
+
+## Waterfall Note Lengths
+
+Waterfall bars use each MIDI note's NoteOn-to-NoteOff duration. A short note renders as a short bar; a sustained note renders as a longer bar whose bottom edge reaches the judgement line at NoteOn and whose top edge reaches it at NoteOff. A small minimum height keeps very short notes visible.
 
 ## Keyboard Mapping
 
@@ -102,6 +124,7 @@ Compose UI (app)
     ├── state holder and actions
     ├── keyboard + USB MIDI input
     ├── playback controls
+    ├── demo-mode scheduler
     ├── waterfall renderer
     └── virtual piano
             │
@@ -118,6 +141,7 @@ Core domain
 - `SongRepository` supplies materialized `Song` objects. `DemoSongRepository` is the current implementation.
 - `KermitPianoStateHolder` is the single owner for song, playback, import, library, viewport, and debug UI state; `KermitPianoApp` renders its read-only `StateFlow` and dispatches typed actions.
 - `PlayerInputTracker` merges computer-keyboard and USB MIDI notes with per-source reference counting, so overlapping NoteOn/NoteOff events do not release a key that another source still holds.
+- `AutoPlayScheduler` is a shared, deterministic MIDI event scheduler; `AutoPlayOutput` is the small boundary that connects it to audio and virtual-key state without making the domain depend on FluidSynth.
 - Compose UI is split into the app shell, `PianoTopBar`, song/import panels, and shared visual tokens; business rules remain outside composables.
 
 ## Project Structure

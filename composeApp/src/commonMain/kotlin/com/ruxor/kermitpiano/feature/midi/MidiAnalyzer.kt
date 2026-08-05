@@ -3,6 +3,7 @@ package com.ruxor.kermitpiano.feature.midi
 import com.ruxor.kermitpiano.core.music.MidiNote
 import com.ruxor.kermitpiano.core.song.Song
 import com.ruxor.kermitpiano.core.song.SongNote
+import com.ruxor.kermitpiano.core.song.PianoHand
 import com.ruxor.kermitpiano.core.timeline.SongTime
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.microseconds
@@ -36,8 +37,28 @@ internal class MidiAnalyzer {
     fun import(analysis: MidiAnalysis, mappings: Map<Int, TrackHand>): PlayableSong {
         val converter = TickTimeConverter(analysis.parsed.ticksPerQuarter, analysis.parsed.tempos)
         val notes = analysis.parsed.tracks.flatMap { track ->
-            if ((mappings[track.index] ?: analysis.tracks[track.index].suggestedHand) == TrackHand.Ignore) emptyList() else
-                track.notes.map { note -> SongNote(MidiNote(note.note), SongTime(converter.microsecondsAt(note.startTick).microseconds)) }
+            val trackAnalysis = analysis.tracks.first { candidate -> candidate.index == track.index }
+            val hand = when (mappings[track.index] ?: trackAnalysis.suggestedHand) {
+                TrackHand.Left -> PianoHand.Left
+                TrackHand.Right -> PianoHand.Right
+                TrackHand.Ignore -> null
+            }
+            if (hand == null) {
+                emptyList()
+            } else {
+                track.notes.map { note ->
+                    val startMicroseconds = converter.microsecondsAt(note.startTick)
+                    val endMicroseconds = converter.microsecondsAt(note.endTick)
+                    SongNote(
+                        note = MidiNote(note.note),
+                        songTime = SongTime(startMicroseconds.microseconds),
+                        duration = (endMicroseconds - startMicroseconds).coerceAtLeast(1L).microseconds,
+                        velocity = note.velocity,
+                        channel = note.channel,
+                        hand = hand,
+                    )
+                }
+            }
         }.sortedBy { it.songTime }
         return PlayableSong(
             song = Song(analysis.songName.lowercase().replace(' ', '-'), analysis.songName, SongTime(analysis.durationMicroseconds.microseconds), notes),

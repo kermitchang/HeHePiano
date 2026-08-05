@@ -32,6 +32,7 @@ import com.ruxor.kermitpiano.core.timeline.PlaybackState
 import com.ruxor.kermitpiano.core.timeline.PlaybackSpeed
 import com.ruxor.kermitpiano.core.timeline.TimelineSnapshot
 import com.ruxor.kermitpiano.feature.audio.AudioEngineState
+import com.ruxor.kermitpiano.feature.autoplay.AutoPlayState
 import com.ruxor.kermitpiano.feature.playback.PlaybackAction
 import com.ruxor.kermitpiano.feature.pianolayout.PianoViewportMode
 
@@ -50,6 +51,10 @@ internal fun PianoTopBar(
     playerSoundEnabled: Boolean,
     onPlayerSoundChanged: (Boolean) -> Unit,
     onLibrary: () -> Unit,
+    demoModeEnabled: Boolean,
+    demoState: AutoPlayState,
+    audioReady: Boolean,
+    onDemoModeChanged: (Boolean) -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
@@ -63,16 +68,19 @@ internal fun PianoTopBar(
                     playbackState, onPlaybackAction, viewportMode, onViewportModeChanged,
                     debugVisible, onDebugChanged, onOpenMidi, songTitle, onSelectNextSong,
                     audioState, playerSoundEnabled, onPlayerSoundChanged, onLibrary,
+                    demoModeEnabled, demoState, audioReady, onDemoModeChanged,
                 )
                 TopBarLayoutMode.Compact -> CompactTopBar(
                     playbackState, onPlaybackAction, viewportMode, onViewportModeChanged,
                     debugVisible, onDebugChanged, onOpenMidi, songTitle, onSelectNextSong,
                     audioState, playerSoundEnabled, onPlayerSoundChanged, onLibrary,
+                    demoModeEnabled, demoState, audioReady, onDemoModeChanged,
                 )
                 TopBarLayoutMode.Narrow -> NarrowTopBar(
                     playbackState, onPlaybackAction, viewportMode, onViewportModeChanged,
                     debugVisible, onDebugChanged, onOpenMidi,
                     audioState, playerSoundEnabled, onPlayerSoundChanged, onLibrary,
+                    demoModeEnabled, demoState, audioReady, onDemoModeChanged,
                 )
             }
         }
@@ -94,13 +102,18 @@ private fun WideTopBar(
     playerSoundEnabled: Boolean,
     onPlayerSoundChanged: (Boolean) -> Unit,
     onLibrary: () -> Unit,
+    demoModeEnabled: Boolean,
+    demoState: AutoPlayState,
+    audioReady: Boolean,
+    onDemoModeChanged: (Boolean) -> Unit,
 ) = TopBarRow {
     Brand(showName = true)
     SongControls(songTitle, onOpenMidi, onSelectSong, showSongTitle = true)
     PlaybackGroup(state, onAction, showRestart = true, compactSpeed = false)
     PianoViewControls(viewport, onViewportChanged)
-    InputBadge()
+    InputBadge(demoModeEnabled)
     AudioStatusButton(audioState, playerSoundEnabled, onPlayerSoundChanged)
+    DemoModeButton(demoModeEnabled, demoState, audioReady, onDemoModeChanged)
     OutlinedButton(onClick = onLibrary) { Text("Library") }
     OutlinedButton(onClick = onDebugChanged) { Text(if (debugVisible) "Hide Debug" else "Debug") }
 }
@@ -120,12 +133,17 @@ private fun CompactTopBar(
     playerSoundEnabled: Boolean,
     onPlayerSoundChanged: (Boolean) -> Unit,
     onLibrary: () -> Unit,
+    demoModeEnabled: Boolean,
+    demoState: AutoPlayState,
+    audioReady: Boolean,
+    onDemoModeChanged: (Boolean) -> Unit,
 ) = TopBarRow {
     Brand(showName = false)
     SongControls(songTitle, onOpenMidi, onSelectSong, showSongTitle = false)
     PlaybackGroup(state, onAction, showRestart = true, compactSpeed = true)
     PianoViewControls(viewport, onViewportChanged)
     AudioStatusButton(audioState, playerSoundEnabled, onPlayerSoundChanged)
+    DemoModeButton(demoModeEnabled, demoState, audioReady, onDemoModeChanged)
     OutlinedButton(onClick = onLibrary) { Text("Library") }
     OutlinedButton(onClick = onDebugChanged) { Text("Debug") }
 }
@@ -143,13 +161,30 @@ private fun NarrowTopBar(
     playerSoundEnabled: Boolean,
     onPlayerSoundChanged: (Boolean) -> Unit,
     onLibrary: () -> Unit,
+    demoModeEnabled: Boolean,
+    demoState: AutoPlayState,
+    audioReady: Boolean,
+    onDemoModeChanged: (Boolean) -> Unit,
 ) = TopBarRow {
     Text(text = "♬", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
     Button(onClick = onOpenMidi) { Text("Open") }
     PlayPauseButton(state, onAction)
     ViewMenu(viewport, onViewportChanged)
     Spacer(Modifier.weight(1f))
-    MoreMenu(state, onAction, debugVisible, onDebugChanged, audioState, playerSoundEnabled, onPlayerSoundChanged, onLibrary)
+    MoreMenu(
+        state = state,
+        onAction = onAction,
+        debugVisible = debugVisible,
+        onDebugChanged = onDebugChanged,
+        audioState = audioState,
+        playerSoundEnabled = playerSoundEnabled,
+        onPlayerSoundChanged = onPlayerSoundChanged,
+        onLibrary = onLibrary,
+        demoModeEnabled = demoModeEnabled,
+        demoState = demoState,
+        audioReady = audioReady,
+        onDemoModeChanged = onDemoModeChanged,
+    )
 }
 
 @Composable
@@ -258,6 +293,10 @@ private fun MoreMenu(
     playerSoundEnabled: Boolean,
     onPlayerSoundChanged: (Boolean) -> Unit,
     onLibrary: () -> Unit,
+    demoModeEnabled: Boolean,
+    demoState: AutoPlayState,
+    audioReady: Boolean,
+    onDemoModeChanged: (Boolean) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -270,8 +309,43 @@ private fun MoreMenu(
             DropdownMenuItem(text = { Text(if (debugVisible) "Hide Debug" else "Debug") }, onClick = { onDebugChanged(); expanded = false })
             DropdownMenuItem(text = { Text(if (playerSoundEnabled) "Player Sound: On" else "Player Sound: Off") }, onClick = { onPlayerSoundChanged(!playerSoundEnabled); expanded = false })
             DropdownMenuItem(text = { Text(audioState.topBarLabel()) }, onClick = { expanded = false })
+            DropdownMenuItem(
+                enabled = audioReady || demoModeEnabled,
+                text = {
+                    Text(
+                        when {
+                            !audioReady && !demoModeEnabled -> "Demo Mode: Audio unavailable"
+                            demoModeEnabled && demoState == AutoPlayState.Playing -> "Demo Mode: Playing"
+                            demoModeEnabled -> "Demo Mode: On"
+                            else -> "Demo Mode: Off"
+                        },
+                    )
+                },
+                onClick = { onDemoModeChanged(!demoModeEnabled); expanded = false },
+            )
             DropdownMenuItem(text = { Text("Local Library") }, onClick = { onLibrary(); expanded = false })
         }
+    }
+}
+
+@Composable
+private fun DemoModeButton(
+    enabled: Boolean,
+    state: AutoPlayState,
+    audioReady: Boolean,
+    onChanged: (Boolean) -> Unit,
+) {
+    OutlinedButton(
+        enabled = audioReady || enabled,
+        onClick = { onChanged(!enabled) },
+    ) {
+        Text(
+            when {
+                enabled && state == AutoPlayState.Playing -> "Demo Playing"
+                enabled -> "Demo On"
+                else -> "Demo Off"
+            },
+        )
     }
 }
 
@@ -295,14 +369,14 @@ internal fun AudioEngineState.topBarLabel(): String = when (this) {
 }
 
 @Composable
-private fun InputBadge() {
+private fun InputBadge(demoModeEnabled: Boolean) {
     Surface(
         color = Color(0xFF17391F),
         contentColor = Color(0xFF9EEB88),
         shape = workspaceShape,
     ) {
         Text(
-            text = "Input: Keyboard",
+            text = if (demoModeEnabled) "Input: Demo" else "Input: Keyboard",
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,

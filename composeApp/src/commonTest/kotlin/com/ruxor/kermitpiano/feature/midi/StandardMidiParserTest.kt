@@ -21,6 +21,12 @@ class StandardMidiParserTest {
         assertEquals(500_000, parsed.tempos.single().microsecondsPerQuarter)
         assertEquals("4/4", parsed.timeSignature)
         assertEquals(MidiTickNote(60, 100, 0, 0, 480), parsed.tracks.single().notes.single())
+
+        val analysis = MidiAnalyzer().analyze("test.mid", parsed)
+        val imported = MidiAnalyzer().import(analysis, emptyMap()).song.notes.single()
+        assertEquals(500_000, imported.duration.inWholeMicroseconds)
+        assertEquals(100, imported.velocity)
+        assertEquals(0, imported.channel)
     }
 
     @Test

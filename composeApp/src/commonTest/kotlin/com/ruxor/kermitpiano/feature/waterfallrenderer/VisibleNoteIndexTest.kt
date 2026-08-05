@@ -33,6 +33,26 @@ class VisibleNoteIndexTest {
         assertEquals(emptyList(), visibleIndices.toList())
     }
 
+    @Test
+    fun `includes a long note that starts before the visible range`() {
+        val noteIndex = VisibleNoteIndex(
+            Song(
+                id = "long-note",
+                title = "Long note",
+                duration = SongTime(6.seconds),
+                notes = listOf(
+                    SongNote(MidiNote(60), SongTime.zero, duration = 4.seconds),
+                    SongNote(MidiNote(64), SongTime(5.seconds)),
+                ),
+            ),
+        )
+
+        assertEquals(
+            listOf(0),
+            noteIndex.visibleIndicesBetween(SongTime(2.seconds), SongTime(3.seconds)),
+        )
+    }
+
     private fun song() = Song(
         id = "visible-notes",
         title = "Visible notes",

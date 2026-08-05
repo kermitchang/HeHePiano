@@ -98,6 +98,22 @@ class KeyboardInputTest {
     }
 
     @Test
+    fun `disabled keyboard input ignores new keys and releases existing keys`() {
+        val input = KeyboardInput()
+        input.onKeyDown(PianoKeyboardKey.A)
+
+        input.enabled = false
+        input.onKeyDown(PianoKeyboardKey.S)
+        input.onKeyUp(PianoKeyboardKey.A)
+
+        assertEquals(emptySet(), input.state.value.pressedNotes)
+        assertEquals(emptySet(), input.playerInputTracker.state.value.pressedNotes)
+        input.enabled = true
+        input.onKeyDown(PianoKeyboardKey.S)
+        assertEquals(setOf(MidiNote(62)), input.state.value.pressedNotes)
+    }
+
+    @Test
     fun `octave controls shift keyboard notes by twelve semitones within piano bounds`() {
         val input = KeyboardInput()
 

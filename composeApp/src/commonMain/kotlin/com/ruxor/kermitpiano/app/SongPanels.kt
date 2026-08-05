@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ruxor.kermitpiano.core.song.PianoHand
 import com.ruxor.kermitpiano.core.song.Song
 import com.ruxor.kermitpiano.core.timeline.PlaybackState
 import com.ruxor.kermitpiano.core.timeline.SongTime
@@ -37,6 +38,7 @@ import com.ruxor.kermitpiano.feature.midi.MidiAnalysis
 import com.ruxor.kermitpiano.feature.midi.TrackHand
 import com.ruxor.kermitpiano.feature.pianolayout.PianoModel
 import com.ruxor.kermitpiano.feature.pianolayout.PianoViewport
+import com.ruxor.kermitpiano.feature.practice.PracticeMode
 import com.ruxor.kermitpiano.feature.songlibrary.SongFile
 import kotlin.time.Duration.Companion.microseconds
 
@@ -122,7 +124,9 @@ internal fun SongInformationPanel(
 internal fun MidiAnalysisPanel(
     analysis: MidiAnalysis,
     mappings: Map<Int, TrackHand>,
+    practiceMode: PracticeMode,
     onMappingChanged: (Int, TrackHand) -> Unit,
+    onPracticeModeChanged: (PracticeMode) -> Unit,
     onCancel: () -> Unit,
     onImport: () -> Unit,
     modifier: Modifier = Modifier,
@@ -146,27 +150,76 @@ internal fun MidiAnalysisPanel(
             InformationRow("Note Count", analysis.noteCount.toString())
             InformationRow("Min / Max Note", "${analysis.minNote ?: "—"} / ${analysis.maxNote ?: "—"}")
             PanelDivider()
+            Text("Practice Part", fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                PracticeMode.entries.forEach { mode ->
+                    if (mode == practiceMode) {
+                        Button(onClick = { onPracticeModeChanged(mode) }) {
+                            Text(mode.label())
+                        }
+                    } else {
+                        OutlinedButton(onClick = { onPracticeModeChanged(mode) }) {
+                            Text(mode.label())
+                        }
+                    }
+                }
+            }
+            Text(
+                text = practiceMode.description(),
+                color = MaterialTheme.colorScheme.outline,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            PanelDivider()
             analysis.tracks.forEach { track ->
-                Text(track.name, fontWeight = FontWeight.Bold)
+                Text("Track ${track.index + 1} · ${track.name}", fontWeight = FontWeight.Bold)
                 InformationRow("Instrument", track.instrument)
                 InformationRow("Channel", track.channels.joinToString().ifEmpty { "—" })
                 InformationRow("Average Pitch", track.averagePitch?.toInt()?.toString() ?: "—")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     TrackHand.entries.forEach { hand ->
-                        OutlinedButton(
-                            enabled = mappings[track.index] != hand,
-                            onClick = { onMappingChanged(track.index, hand) },
-                        ) { Text(hand.name.uppercase()) }
+                        if (mappings[track.index] == hand) {
+                            Button(onClick = { onMappingChanged(track.index, hand) }) { Text(hand.name.uppercase()) }
+                        } else {
+                            OutlinedButton(onClick = { onMappingChanged(track.index, hand) }) { Text(hand.name.uppercase()) }
+                        }
                     }
                 }
                 PanelDivider()
             }
+            val practiceTrackHands = practiceMode.playerHands.map(PianoHand::toTrackHand).toSet()
+            val hasPracticeNotes = analysis.tracks.any { track ->
+                track.noteCount > 0 && mappings[track.index] in practiceTrackHands
+            }
+            if (!hasPracticeNotes) {
+                Text(
+                    text = "Select at least one ${practiceMode.label().lowercase()} track before importing.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = onCancel) { Text("Cancel") }
-                Button(onClick = onImport) { Text("Import Song") }
+                Button(enabled = hasPracticeNotes, onClick = onImport) { Text("Import Song") }
             }
         }
     }
+}
+
+private fun PracticeMode.label(): String = when (this) {
+    PracticeMode.LeftHand -> "Left Hand"
+    PracticeMode.RightHand -> "Right Hand"
+    PracticeMode.BothHands -> "Both Hands"
+}
+
+private fun PracticeMode.description(): String = when (this) {
+    PracticeMode.LeftHand -> "You play the left hand; the computer plays the right hand."
+    PracticeMode.RightHand -> "You play the right hand; the computer plays the left hand."
+    PracticeMode.BothHands -> "You play both hands; accompaniment is disabled."
+}
+
+private fun PianoHand.toTrackHand(): TrackHand = when (this) {
+    PianoHand.Left -> TrackHand.Left
+    PianoHand.Right -> TrackHand.Right
 }
 
 @Composable
