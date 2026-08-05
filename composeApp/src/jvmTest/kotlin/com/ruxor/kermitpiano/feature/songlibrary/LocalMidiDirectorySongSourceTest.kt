@@ -1,9 +1,12 @@
 package com.ruxor.kermitpiano.feature.songlibrary
 
+import com.ruxor.kermitpiano.feature.midi.MidiImportPolicy
+import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class LocalMidiDirectorySongSourceTest {
     @Test
@@ -17,5 +20,22 @@ class LocalMidiDirectorySongSourceTest {
 
         assertEquals(listOf("a.mid", "b.midi"), songs.map { it.name })
         check(directory.deleteRecursively())
+    }
+
+    @Test
+    fun `local source rejects files over the import limit before reading`(): Unit = runBlocking {
+        val directory = Files.createTempDirectory("kermit-midi-library-limit").toFile()
+        val file = directory.resolve("large.mid")
+        RandomAccessFile(file, "rw").use { it.setLength(MidiImportPolicy.MAX_FILE_BYTES.toLong() + 1) }
+
+        try {
+            assertFailsWith<IllegalArgumentException> {
+                LocalMidiDirectorySongSource(directory).load(
+                    SongFile(file.name, file.name, file.length(), file.lastModified()),
+                )
+            }
+        } finally {
+            check(directory.deleteRecursively())
+        }
     }
 }

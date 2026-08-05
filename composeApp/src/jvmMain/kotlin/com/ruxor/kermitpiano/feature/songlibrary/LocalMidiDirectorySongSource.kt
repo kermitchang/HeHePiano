@@ -1,6 +1,8 @@
 package com.ruxor.kermitpiano.feature.songlibrary
 
+import com.ruxor.kermitpiano.feature.midi.MidiImportPolicy
 import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
+import com.ruxor.kermitpiano.feature.midi.readMidiBytes
 import java.io.File
 
 internal class LocalMidiDirectorySongSource(private val directory: File) : LoadableSongSource {
@@ -18,10 +20,11 @@ internal class LocalMidiDirectorySongSource(private val directory: File) : Loada
     override suspend fun load(songFile: SongFile): SelectedMidiFile {
         val file = File(directory, songFile.id)
         require(file.isFile) { "The selected local MIDI file no longer exists." }
-        return SelectedMidiFile(file.name, file.readBytes())
+        return SelectedMidiFile(file.name, file.readMidiBytes())
     }
 
     suspend fun copyToLibrary(selected: SelectedMidiFile): SongFile {
+        MidiImportPolicy.validationError(selected)?.let { message -> throw IllegalArgumentException(message) }
         directory.mkdirs()
         val uniqueName = MidiLibraryPolicy.uniqueCopyName(selected.name, directory.list().orEmpty().toSet())
         val target = File(directory, uniqueName)

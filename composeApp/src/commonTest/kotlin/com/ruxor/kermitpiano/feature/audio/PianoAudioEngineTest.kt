@@ -52,6 +52,25 @@ class PianoAudioEngineTest {
     }
 
     @Test
+    fun `disabling player sound clears the engine and still forwards note off`() {
+        val engine = FakePianoAudioEngine()
+        val router = PlayerInputAudioRouter(engine)
+
+        router.noteOn(60, 96)
+        router.enabled = false
+        router.noteOff(60)
+
+        assertEquals(
+            listOf(
+                AudioEvent.NoteOn(60, 96, 0),
+                AudioEvent.AllNotesOff,
+                AudioEvent.NoteOff(60, 0),
+            ),
+            engine.events,
+        )
+    }
+
+    @Test
     fun `test C4 sends a note on then note off only when the engine is ready`() = runBlocking {
         val engine = FakePianoAudioEngine()
 

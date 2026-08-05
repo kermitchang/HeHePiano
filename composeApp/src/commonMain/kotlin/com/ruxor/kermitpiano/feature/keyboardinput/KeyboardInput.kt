@@ -1,11 +1,15 @@
 package com.ruxor.kermitpiano.feature.keyboardinput
 
 import com.ruxor.kermitpiano.core.music.MidiNote
+import com.ruxor.kermitpiano.core.playerinput.PlayerInputSource
+import com.ruxor.kermitpiano.core.playerinput.PlayerInputTracker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-internal class KeyboardInput {
+internal class KeyboardInput(
+    val playerInputTracker: PlayerInputTracker = PlayerInputTracker(),
+) {
     private val pressedKeys = linkedMapOf<PianoKeyboardKey, MidiNote>()
     private var octave = DEFAULT_KEYBOARD_OCTAVE
     private val mutableState = MutableStateFlow(KeyboardInputState())
@@ -17,18 +21,38 @@ internal class KeyboardInput {
         eventListener = listener
     }
 
+    fun clearEventListener() {
+        eventListener = {}
+    }
+
     fun onKeyDown(key: PianoKeyboardKey) {
         if (key in pressedKeys) return
         val note = MidiNote(key.midiValueAt(octave))
         pressedKeys[key] = note
+        playerInputTracker.noteOn(PlayerInputSource.ComputerKeyboard, note)
 
         publish(note, KeyboardEventType.KeyDown)
     }
 
     fun onKeyUp(key: PianoKeyboardKey) {
         val note = pressedKeys.remove(key) ?: return
+        playerInputTracker.noteOff(PlayerInputSource.ComputerKeyboard, note)
 
         publish(note, KeyboardEventType.KeyUp)
+    }
+
+    fun releaseAll() {
+        val notes = pressedKeys.values.toList()
+        pressedKeys.clear()
+        notes.forEach { note ->
+            playerInputTracker.noteOff(PlayerInputSource.ComputerKeyboard, note)
+            eventListener(KeyboardEvent(note = note, type = KeyboardEventType.KeyUp))
+        }
+        mutableState.value = mutableState.value.copy(
+            pressedNotes = emptySet(),
+            lastEvent = notes.lastOrNull()?.let { note -> KeyboardEvent(note, KeyboardEventType.KeyUp) },
+            midiRange = midiRange(),
+        )
     }
 
     fun octaveDown() {

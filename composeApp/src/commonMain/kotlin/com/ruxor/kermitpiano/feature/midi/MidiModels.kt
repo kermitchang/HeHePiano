@@ -54,3 +54,8 @@ internal data class MidiAnalysis(
 )
 
 internal data class SelectedMidiFile(val name: String, val bytes: ByteArray)
+
+internal data class MidiFileSelection(
+    val name: String,
+    val load: suspend () -> SelectedMidiFile,
+)

@@ -1,10 +1,10 @@
 package com.ruxor.kermitpiano.app
 
-import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
+import com.ruxor.kermitpiano.feature.midi.MidiFileSelection
 
 internal fun requestMidiImport(
-    openMidiFile: () -> SelectedMidiFile?,
-    onFileSelected: (SelectedMidiFile) -> Unit,
+    openMidiFile: () -> MidiFileSelection?,
+    onFileSelected: (MidiFileSelection) -> Unit,
 ) {
     openMidiFile()?.let(onFileSelected)
 }

@@ -55,6 +55,10 @@ The lookup order is the configured path, the `kermitpiano.soundfont` JVM propert
 
 If FluidSynth or a SoundFont is missing, the app stays playable in NoAudio mode and shows its audio status. Everything in `source/soundfonts/` is intentionally ignored by Git except the directory documentation and `LICENSE-*.txt` files, preventing proprietary or licence-restricted audio assets from being committed accidentally.
 
+## MIDI Import Safety
+
+**Open MIDI** first selects a file, then loads and parses it off the UI thread. Empty files and files larger than 16 MiB are rejected before parsing. The UI exposes `Analyzing`, `Ready`, and `Failure` states, so a malformed or unreadable file reports an actionable error without blocking playback or crashing the application. Track hand mappings are only applied after the analysis is ready.
+
 ## Keyboard Mapping
 
 Key-down events play the following MIDI notes. Releasing a key releases only that note; repeated key-down events are ignored until the key is released.
@@ -82,6 +86,7 @@ Besides the computer keyboard, the app also reads from a **USB MIDI keyboard** (
 
 - On startup it scans and connects to a MIDI device whose name contains `AK490` (tune the keyword via `deviceNameContains` in `UsbMidiInput`).
 - **NoteOn / NoteOff** events are routed to the audio engine immediately.
+- Note velocity is preserved for USB NoteOn events, and USB notes share the same active-note state as computer-keyboard notes in the virtual piano.
 - **Pitch Bend wheel** → pitch slide effect.
 - **Modulation wheel** → vibrato/tremolo effect (CC1).
 - The keyboard's **Octave + / - buttons** are handled in hardware by the keyboard itself; the app receives the already-shifted notes.
@@ -94,7 +99,8 @@ The project currently has one `composeApp` module. It keeps business rules in sh
 
 ```text
 Compose UI (app)
-    ├── keyboard input
+    ├── state holder and actions
+    ├── keyboard + USB MIDI input
     ├── playback controls
     ├── waterfall renderer
     └── virtual piano
@@ -110,7 +116,9 @@ Core domain
 - `TimelineEngine` keeps the monotonic game clock, song playback time, speed, pause/resume, restart, and looping separate from rendering.
 - `WaterfallRenderer` uses one Canvas and renders only visible notes from a time-sorted song.
 - `SongRepository` supplies materialized `Song` objects. `DemoSongRepository` is the current implementation.
-- Keyboard and playback controllers own mutable state and expose read-only `StateFlow` to the UI.
+- `KermitPianoStateHolder` is the single owner for song, playback, import, library, viewport, and debug UI state; `KermitPianoApp` renders its read-only `StateFlow` and dispatches typed actions.
+- `PlayerInputTracker` merges computer-keyboard and USB MIDI notes with per-source reference counting, so overlapping NoteOn/NoteOff events do not release a key that another source still holds.
+- Compose UI is split into the app shell, `PianoTopBar`, song/import panels, and shared visual tokens; business rules remain outside composables.
 
 ## Project Structure
 

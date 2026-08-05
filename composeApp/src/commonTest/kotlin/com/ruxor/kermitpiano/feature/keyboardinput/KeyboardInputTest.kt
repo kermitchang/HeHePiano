@@ -1,6 +1,7 @@
 package com.ruxor.kermitpiano.feature.keyboardinput
 
 import com.ruxor.kermitpiano.core.music.MidiNote
+import com.ruxor.kermitpiano.core.playerinput.PlayerInputSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -67,6 +68,33 @@ class KeyboardInputTest {
 
         assertEquals(setOf(MidiNote(62)), input.state.value.pressedNotes)
         assertEquals(KeyboardEvent(MidiNote(60), KeyboardEventType.KeyUp), input.state.value.lastEvent)
+    }
+
+    @Test
+    fun `clearing event listener prevents callbacks after disposal`() {
+        val input = KeyboardInput()
+        var callbackCount = 0
+        input.setEventListener { callbackCount += 1 }
+
+        input.onKeyDown(PianoKeyboardKey.A)
+        input.clearEventListener()
+        input.onKeyUp(PianoKeyboardKey.A)
+
+        assertEquals(1, callbackCount)
+    }
+
+    @Test
+    fun `release all clears tracker and emits note offs to the audio listener`() {
+        val input = KeyboardInput()
+        val events = mutableListOf<KeyboardEvent>()
+        input.setEventListener(events::add)
+        input.onKeyDown(PianoKeyboardKey.A)
+
+        input.releaseAll()
+
+        assertEquals(listOf(KeyboardEvent(MidiNote(60), KeyboardEventType.KeyDown), KeyboardEvent(MidiNote(60), KeyboardEventType.KeyUp)), events)
+        assertEquals(emptySet(), input.playerInputTracker.state.value.pressedNotes)
+        assertEquals(emptySet(), input.playerInputTracker.state.value.notesBySource[PlayerInputSource.ComputerKeyboard])
     }
 
     @Test

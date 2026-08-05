@@ -49,6 +49,10 @@ KERMITPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
 
 若缺少 FluidSynth 或 SoundFont，應用仍會以 NoAudio 模式正常運作，並顯示音訊狀態。`source/soundfonts/` 內所有內容（除目錄說明文件與 `LICENSE-*.txt` 外）都被 Git 忽略，避免意外提交有版權或授權限制的音訊資產。
 
+## MIDI 匯入安全性
+
+按下 **Open MIDI** 後會先選取檔案，再於 UI 執行緒之外讀取與解析。空檔案及超過 16 MiB 的檔案會在解析前拒絕；介面明確呈現 `Analyzing`、`Ready` 與 `Failure` 狀態，格式錯誤或無法讀取時會顯示可處理的錯誤，不會阻塞播放或讓應用程式崩潰。音軌左右手對應只會在分析完成後套用。
+
 ## 鍵盤對應（Keyboard Mapping）
 
 按下按鍵即發出對應 MIDI 音符。放開按鍵只釋放該音符；重複按下會被忽略，直到按鍵放開。
@@ -76,6 +80,7 @@ KERMITPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
 
 - 啟動時自動掃描並連接名稱含 `AK490` 的 MIDI 裝置（可於 `UsbMidiInput` 的 `deviceNameContains` 調整關鍵字）。
 - 琴鍵的 **NoteOn / NoteOff** 會即時路由到音訊引擎發聲。
+- USB NoteOn 的力度（velocity）會保留；USB MIDI 與電腦鍵盤共用同一份按鍵狀態，因此虛擬鋼琴會正確呈現兩種輸入的重疊音符。
 - **Pitch Bend（彎音）輪** → 音高滑動效果。
 - **Modulation（調變）輪** → 顫音/震音效果（CC1）。
 - 琴上的 **Octave + / - 按鈕** 由琴本身硬體處理八度移位，應用直接接收移位後的正確音高。
@@ -88,6 +93,7 @@ KERMITPIANO_SOUNDFONT=/absolute/path/to/piano.sf2 ./gradlew :composeApp:run
 
 ```text
 Compose UI (app)
+    ├── state holder/actions 狀態持有者與動作
     ├── keyboard input     鍵盤輸入（電腦鍵盤 + USB MIDI 琴）
     ├── playback controls  播放控制
     ├── waterfall renderer 瀑布流譜面
@@ -104,7 +110,9 @@ Core domain
 - `TimelineEngine` 將單調遊戲時鐘、歌曲播放時間、速度、暫停/繼續、重啟與循環，與渲染邏輯分離。
 - `WaterfallRenderer` 使用單一 Canvas，只渲染時間排序後的可見音符。
 - `SongRepository` 提供具體化的 `Song` 物件，目前實作為 `DemoSongRepository`。
-- 鍵盤與播放控制器各自持有可變狀態，並以唯讀 `StateFlow` 暴露給 UI。
+- `KermitPianoStateHolder` 統一持有歌曲、播放、匯入、樂曲庫、視窗與除錯狀態；`KermitPianoApp` 只渲染唯讀 `StateFlow` 並分派具型別的動作。
+- `PlayerInputTracker` 以來源分開計數並合併電腦鍵盤與 USB MIDI 音符，避免兩個來源重疊時過早釋放按鍵。
+- Compose UI 已拆成 App shell、`PianoTopBar`、歌曲／匯入面板與共用視覺 token；業務規則不放在 composable 中。
 
 ## 專案結構（Project Structure）
 

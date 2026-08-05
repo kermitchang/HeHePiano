@@ -2,17 +2,21 @@ package com.ruxor.kermitpiano
 
 import androidx.compose.ui.window.singleWindowApplication
 import com.ruxor.kermitpiano.app.KermitPianoApp
-import com.ruxor.kermitpiano.feature.keyboardinput.KeyboardInput
-import com.ruxor.kermitpiano.feature.keyboardinput.handle
-import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
-import com.ruxor.kermitpiano.feature.midi.UsbMidiInput
 import com.ruxor.kermitpiano.feature.audio.FluidSynthPianoAudioEngine
 import com.ruxor.kermitpiano.feature.audio.PianoAudioConfig
 import com.ruxor.kermitpiano.feature.audio.SoundFontLocator
+import com.ruxor.kermitpiano.feature.keyboardinput.KeyboardInput
+import com.ruxor.kermitpiano.feature.keyboardinput.handle
+import com.ruxor.kermitpiano.feature.midi.MidiFileSelection
+import com.ruxor.kermitpiano.feature.midi.SelectedMidiFile
+import com.ruxor.kermitpiano.feature.midi.readMidiBytes
+import com.ruxor.kermitpiano.feature.midi.UsbMidiInput
 import com.ruxor.kermitpiano.feature.songlibrary.LocalMidiDirectorySongSource
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 fun main() {
     val keyboardInput = KeyboardInput()
@@ -55,12 +59,16 @@ private fun com.ruxor.kermitpiano.feature.audio.AudioStartupInfo.toDebugLog(): S
     append("failureReason=$discoveryFailureReason")
 }
 
-private fun openMidiFile(): SelectedMidiFile? {
+private fun openMidiFile(): MidiFileSelection? {
     val dialog = FileDialog(null as Frame?, "Open MIDI", FileDialog.LOAD).apply {
         filenameFilter = java.io.FilenameFilter { _, name -> name.endsWith(".mid", true) || name.endsWith(".midi", true) }
         isVisible = true
     }
     val name = dialog.file ?: return null
     val file = File(dialog.directory, name)
-    return SelectedMidiFile(file.name, file.readBytes())
+    return MidiFileSelection(file.name) {
+        withContext(Dispatchers.IO) {
+            SelectedMidiFile(file.name, file.readMidiBytes())
+        }
+    }
 }
