@@ -1,5 +1,7 @@
 package com.ruxor.hehepiano
 
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.singleWindowApplication
 import com.ruxor.hehepiano.app.HeHePianoApp
 import com.ruxor.hehepiano.feature.audio.FluidSynthPianoAudioEngine
@@ -33,6 +35,7 @@ fun main() {
 
     singleWindowApplication(
         title = "HeHePiano",
+        state = WindowState(placement = WindowPlacement.Maximized),
         onKeyEvent = keyboardInput::handle,
     ) {
         HeHePianoApp(

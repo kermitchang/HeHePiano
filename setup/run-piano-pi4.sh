@@ -9,7 +9,8 @@
 # ============================================================================
 set -euo pipefail
 
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$(dirname "$SCRIPT_DIR")"
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-arm64}"
 export PATH="$JAVA_HOME/bin:$PATH"
 

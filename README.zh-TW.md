@@ -9,7 +9,11 @@ HeHePiano 是一個以 **Kotlin Multiplatform + Compose Multiplatform** 打造�
 - JDK 21
 - 專案內建的 Gradle Wrapper
 
-## 建置（Build）
+## 開啟方式與各平台建置
+
+所有指令都請在專案根目錄 `HeHePiano/` 執行。Gradle Wrapper 會自動下載所需依賴；第一次建置需要網路連線。原生安裝包必須在目標平台上建置，不能直接用 macOS 產生 Windows 安裝包。
+
+### 共用指令
 
 執行完整建置與共用單元測試：
 
@@ -17,15 +21,114 @@ HeHePiano 是一個以 **Kotlin Multiplatform + Compose Multiplatform** 打造�
 ./gradlew build
 ```
 
-## 執行（Run）
-
-啟動桌面應用程式：
+macOS、Ubuntu 與 Raspberry Pi 4 直接啟動桌面應用程式：
 
 ```shell
 ./gradlew :composeApp:run
 ```
 
-應用程式預設以 **練習（Practice）** 模式啟動。可使用 **Open MIDI** 選擇外部檔案，或透過 **Library** 從 `source/midi/` 挑選歌曲；已存在於本地樂曲庫的檔案會在啟動時掃描，也可以重複分析。
+Windows PowerShell 使用 `gradlew.bat`：
+
+```powershell
+.\gradlew.bat :composeApp:run
+```
+
+啟動時視窗會自動最大化，應用程式預設以 **練習（Practice）** 模式啟動。可使用 **Open MIDI** 選擇外部檔案，或透過 **Library** 從 `source/midi/` 挑選歌曲；已存在於本地樂曲庫的檔案會在啟動時掃描，也可以重複分析。
+
+### macOS
+
+需求：JDK 21；若要啟用鋼琴音訊，可另外安裝 FluidSynth（Homebrew 範例）：
+
+```shell
+brew install --cask temurin@21
+brew install fluid-synth
+```
+
+開啟開發版：
+
+```shell
+./gradlew :composeApp:run
+```
+
+建立 macOS 安裝包（`.dmg` 與 `.pkg`）：
+
+```shell
+./gradlew :composeApp:packageDmg :composeApp:packagePkg
+```
+
+輸出位於 `composeApp/build/compose/binaries/main/dmg/` 與 `composeApp/build/compose/binaries/main/pkg/`。雙擊 `.dmg` 或 `.pkg` 完成安裝後，即可從 Finder／Launchpad 開啟 HeHePiano。
+
+### Windows
+
+需求：JDK 21 與 PowerShell。開啟開發版：
+
+```powershell
+.\gradlew.bat :composeApp:run
+```
+
+執行完整建置與測試：
+
+```powershell
+.\gradlew.bat build
+```
+
+建立 Windows 安裝包（`.msi` 與 `.exe`）：
+
+```powershell
+.\gradlew.bat :composeApp:packageMsi :composeApp:packageExe
+```
+
+輸出位於 `composeApp/build/compose/binaries/main/msi/` 與 `composeApp/build/compose/binaries/main/exe/`。雙擊 `.msi` 安裝，或直接執行 `.exe`。
+
+若 SoundFont 位於其他位置，PowerShell 的環境變數寫法如下：
+
+```powershell
+$env:HEHEPIANO_SOUNDFONT = "C:\absolute\path\to\piano.sf2"
+.\gradlew.bat :composeApp:run
+```
+
+### Ubuntu
+
+需求：JDK 21；Ubuntu 也可以用下列指令安裝 FluidSynth 與無螢幕測試所需的 Xvfb：
+
+```shell
+sudo apt update
+sudo apt install -y openjdk-21-jdk fluidsynth xvfb
+```
+
+開啟開發版：
+
+```shell
+./gradlew :composeApp:run
+```
+
+建立 Linux 安裝包（`.deb` 與 `.rpm`）：
+
+```shell
+./gradlew :composeApp:packageDeb :composeApp:packageRpm
+```
+
+輸出位於 `composeApp/build/compose/binaries/main/deb/` 與 `rpm/`。Ubuntu 使用者可安裝 `.deb`，或從應用程式選單開啟安裝後的 HeHePiano。
+
+### Raspberry Pi 4
+
+建議使用 64-bit Raspberry Pi OS／Ubuntu、ARM64 JDK 21，並在 Pi4 上直接建置。專案提供的腳本會自動切換到專案根目錄，並在硬體渲染失敗時退回軟體渲染：
+
+```shell
+chmod +x setup/run-piano-pi4.sh
+./setup/run-piano-pi4.sh              # 有螢幕：啟動應用程式
+./setup/run-piano-pi4.sh --headless  # SSH／無螢幕：使用 Xvfb
+./setup/run-piano-pi4.sh --build     # 只執行完整建置與測試
+```
+
+若尚未安裝 JDK 21 或 Xvfb：
+
+```shell
+sudo apt update
+sudo apt install -y openjdk-21-jdk xvfb fluidsynth
+```
+
+Pi4 也可略過腳本，直接執行 `./gradlew :composeApp:run --no-daemon`。腳本會設定 `JAVA_HOME`、顯示器與渲染環境；使用實體螢幕時請確認 `DISPLAY` 或 `WAYLAND_DISPLAY` 已設定。
 
 ## 本地 MIDI 樂曲庫
 
@@ -152,16 +255,6 @@ HeHePiano/
 │   └── run-piano-pi4.sh    Raspberry Pi 4 啟動腳本
 ├── AGENTS.md               儲存庫工程規範
 └── README.md               本說明文件
-```
-
-### Raspberry Pi 4 啟動方式
-
-專案提供 Pi4 專用啟動腳本 `setup/run-piano-pi4.sh`：
-
-```shell
-./setup/run-piano-pi4.sh            # 有接螢幕時啟動（硬體渲染）
-./setup/run-piano-pi4.sh --headless # 無螢幕/SSH 遠端（Xvfb + 軟體渲染）
-./setup/run-piano-pi4.sh --build    # 只編譯不啟動
 ```
 
 ## 未來規劃（Future Plan）

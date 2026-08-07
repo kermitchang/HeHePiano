@@ -43,8 +43,10 @@ compose.desktop {
         nativeDistributions {
             targetFormats(
                 TargetFormat.Dmg,
+                TargetFormat.Exe,
                 TargetFormat.Pkg,
                 TargetFormat.Deb,
+                TargetFormat.Msi,
                 TargetFormat.Rpm,
             )
             packageName = "HeHePiano"

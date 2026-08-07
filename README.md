@@ -9,7 +9,11 @@ HeHePiano is a Kotlin Multiplatform desktop piano-practice prototype built with 
 - JDK 21
 - The checked-in Gradle Wrapper
 
-## Build
+## Launching and Building by Platform
+
+Run all commands from the repository root, `HeHePiano/`. The Gradle Wrapper downloads its dependencies automatically, so the first build needs network access. Native installers must be built on their target operating system; macOS cannot directly produce a Windows installer.
+
+### Common commands
 
 Run the complete build and shared unit-test suite:
 
@@ -17,15 +21,114 @@ Run the complete build and shared unit-test suite:
 ./gradlew build
 ```
 
-## Run
-
-Launch the desktop application:
+Launch the desktop application on macOS, Ubuntu, or Raspberry Pi 4:
 
 ```shell
 ./gradlew :composeApp:run
 ```
 
-The app starts in **Practice** mode. Use **Open MIDI** to choose an external file, or **Library** to select a song from `source/midi/`. Files already in the local library are scanned at startup and can be analyzed repeatedly.
+Use `gradlew.bat` from Windows PowerShell:
+
+```powershell
+.\gradlew.bat :composeApp:run
+```
+
+The window opens maximized and the app starts in **Practice** mode. Use **Open MIDI** to choose an external file, or **Library** to select a song from `source/midi/`. Files already in the local library are scanned at startup and can be analyzed repeatedly.
+
+### macOS
+
+Requirements: JDK 21. Install FluidSynth as well if piano audio is needed (Homebrew example):
+
+```shell
+brew install --cask temurin@21
+brew install fluid-synth
+```
+
+Launch the development app:
+
+```shell
+./gradlew :composeApp:run
+```
+
+Build macOS installers (`.dmg` and `.pkg`):
+
+```shell
+./gradlew :composeApp:packageDmg :composeApp:packagePkg
+```
+
+Artifacts are written to `composeApp/build/compose/binaries/main/dmg/` and `composeApp/build/compose/binaries/main/pkg/`. Open the `.dmg` or `.pkg` to install HeHePiano, then launch it from Finder or Launchpad.
+
+### Windows
+
+Requirements: JDK 21 and PowerShell. Launch the development app:
+
+```powershell
+.\gradlew.bat :composeApp:run
+```
+
+Run the complete build and tests:
+
+```powershell
+.\gradlew.bat build
+```
+
+Build Windows installers (`.msi` and `.exe`):
+
+```powershell
+.\gradlew.bat :composeApp:packageMsi :composeApp:packageExe
+```
+
+Artifacts are written to `composeApp/build/compose/binaries/main/msi/` and `composeApp/build/compose/binaries/main/exe/`. Double-click the `.msi` to install, or run the `.exe` directly.
+
+For a SoundFont stored elsewhere, set the PowerShell environment variable before launching:
+
+```powershell
+$env:HEHEPIANO_SOUNDFONT = "C:\absolute\path\to\piano.sf2"
+.\gradlew.bat :composeApp:run
+```
+
+### Ubuntu
+
+Requirements: JDK 21. The following also installs FluidSynth and Xvfb for headless runs:
+
+```shell
+sudo apt update
+sudo apt install -y openjdk-21-jdk fluidsynth xvfb
+```
+
+Launch the development app:
+
+```shell
+./gradlew :composeApp:run
+```
+
+Build Linux installers (`.deb` and `.rpm`):
+
+```shell
+./gradlew :composeApp:packageDeb :composeApp:packageRpm
+```
+
+Artifacts are written to `composeApp/build/compose/binaries/main/deb/` and `rpm/`. Ubuntu users can install the `.deb`, then launch HeHePiano from the application menu.
+
+### Raspberry Pi 4
+
+Use a 64-bit Raspberry Pi OS or Ubuntu image with an ARM64 JDK 21. Build directly on the Pi4. The provided launcher changes to the repository root and falls back to software rendering when hardware rendering is unavailable:
+
+```shell
+chmod +x setup/run-piano-pi4.sh
+./setup/run-piano-pi4.sh              # display attached: launch the app
+./setup/run-piano-pi4.sh --headless  # SSH / no display: use Xvfb
+./setup/run-piano-pi4.sh --build     # run the complete build and tests only
+```
+
+If JDK 21 or Xvfb is not installed yet:
+
+```shell
+sudo apt update
+sudo apt install -y openjdk-21-jdk xvfb fluidsynth
+```
+
+You can also bypass the helper and run `./gradlew :composeApp:run --no-daemon` directly. The helper sets `JAVA_HOME`, display, and rendering environment variables; with a physical display, make sure `DISPLAY` or `WAYLAND_DISPLAY` is set.
 
 ## Local Source Assets
 
@@ -158,16 +261,6 @@ HeHePiano/
 │   └── run-piano-pi4.sh    Raspberry Pi 4 launcher script
 ├── AGENTS.md               Repository engineering rules
 └── README.md
-```
-
-### Raspberry Pi 4 Launch
-
-A Pi4-specific launcher is provided at `setup/run-piano-pi4.sh`:
-
-```shell
-./setup/run-piano-pi4.sh            # launch with a display (hardware rendering)
-./setup/run-piano-pi4.sh --headless # headless / SSH (Xvfb + software rendering)
-./setup/run-piano-pi4.sh --build    # build only, do not launch
 ```
 
 ## Future Plan
